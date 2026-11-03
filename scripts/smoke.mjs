@@ -1,6 +1,5 @@
-// End-to-end smoke test: builds must already exist in dist/ (`npm run build`).
-// Serves dist/, boots the game in headless Chromium, plays a few seconds, walks the menus in
-// English and Chinese, fails on any console error, and writes screenshots to ./shots/.
+// Bounded preview smoke check for the complete ETHIO-NASA mission flow.
+// Builds must already exist in dist/ (`pnpm build`). Captures are evidence, not release inputs.
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -9,139 +8,155 @@ const port = 4300 + Math.floor(Math.random() * 500)
 const url = `http://127.0.0.1:${port}/`
 const out = process.env.SHOTS_DIR ?? 'shots'
 mkdirSync(out, { recursive: true })
-
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore', detached: false })
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore' })
 let browser
+const errors = []
 const guard = setTimeout(() => fail('timed out'), 120_000)
 
-function cleanup() {
-  clearTimeout(guard)
-  try { server.kill('SIGTERM') } catch {}
-}
-async function fail(msg) {
-  console.error(`smoke: FAIL — ${msg}`)
+function cleanup() { clearTimeout(guard); try { server.kill('SIGTERM') } catch {} }
+async function fail(message) {
+  console.error(`smoke: FAIL — ${message}`)
   await browser?.close().catch(() => {})
   cleanup()
   process.exit(1)
 }
-
 async function waitForServer() {
   for (let i = 0; i < 60; i += 1) {
-    try {
-      if ((await fetch(url)).ok) return
-    } catch {}
-    await new Promise(r => setTimeout(r, 250))
+    try { if ((await fetch(url)).ok) return } catch {}
+    await new Promise(resolve => setTimeout(resolve, 250))
   }
   throw new Error('preview server did not start')
 }
-
-async function openGame(context, errors) {
-  const page = await context.newPage()
-  page.on('console', m => m.type() === 'error' && errors.push(m.text()))
-  page.on('pageerror', e => errors.push(String(e)))
-  page.on('response', r => r.status() >= 400 && errors.push(`HTTP ${r.status()} ${r.url()}`))
-  await page.goto(url)
-  await page.waitForSelector('[data-screen="title"].is-active', { timeout: 30_000 })
-  await page.evaluate(async () => {
-    await document.fonts.ready
-    const expected = document.documentElement.lang === 'zh-CN' ? 'ManusCC0 Sans CJK SC' : 'ManusCC0'
-    for (const selector of ['.logo-text', '.tagline']) {
-      const family = getComputedStyle(document.querySelector(selector)).fontFamily
-      if (!family.startsWith(`"${expected}"`) && !family.startsWith(expected + ',')) {
-        throw new Error(`Unexpected game font: ${family}`)
-      }
-    }
-    if (![...document.fonts].some(face => face.family.replaceAll('"', '').replaceAll("'", '') === expected && face.status === 'loaded')) {
-      throw new Error(`Bundled font did not load: ${expected}`)
-    }
+function listen(page) {
+  page.on('console', message => {
+    const text = message.text()
+    // Browser omits the failed URL from this generic message; URL-aware response/request
+    // handlers below still fail local assets while the NASA pipeline may use its fallback.
+    if (message.type() === 'error' && /Failed to load resource:/.test(text)) return
+    if (message.type() === 'error' && !/api\.nasa\.gov|ERR_ABORTED|AbortError/i.test(text)) errors.push(text)
   })
-  await page.waitForTimeout(900)
+  page.on('pageerror', error => errors.push(String(error)))
+  page.on('requestfailed', request => {
+    const uri = request.url(), reason = request.failure()?.errorText || 'failed'
+    if (/api\.nasa\.gov|ERR_ABORTED|AbortError/i.test(`${uri} ${reason}`)) return
+    errors.push(`Network ${reason} ${uri}`)
+  })
+  page.on('response', response => {
+    if (response.status() >= 400 && !/api\.nasa\.gov/.test(response.url())) errors.push(`HTTP ${response.status()} ${response.url()}`)
+  })
+}
+async function openGame(context) {
+  const page = await context.newPage(); listen(page)
+  await page.goto(url, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => window.__game?.engine?.renderer?.info?.render?.calls > 0, null, { timeout: 30_000 })
+  await page.waitForSelector('#mission-panel:not(.is-hidden)', { timeout: 10_000 })
+  const ready = await page.evaluate(async () => await window.__game.ready)
+  if (ready?.[0]?.status !== 'fulfilled' || ready[0].value !== 3) throw new Error(`the three generated spacecraft models did not load: ${JSON.stringify(ready?.[0])}`)
+  if (ready?.[1]?.status !== 'fulfilled' || !(ready[1].value.asteroids?.length > 0)) throw new Error('NASA feeds and offline fallback did not provide asteroid vectors')
   return page
 }
-
-const state = page => page.evaluate(() => {
-  const { game } = window.__game
-  const p = game['player'].root.position
-  return { mode: game.mode, run: game.run, pos: { x: p.x, y: p.y, z: p.z } }
-})
+async function verifyLayout(page, label) {
+  const report = await page.evaluate(() => {
+    const width = innerWidth, height = innerHeight
+    const canvas = document.getElementById('game').getBoundingClientRect()
+    const controls = [...document.querySelectorAll('#ui-overlay button, #ui-overlay input, #ui-overlay select')]
+      .filter(element => getComputedStyle(element).display !== 'none' && element.getClientRects().length)
+      .map(element => { const r = element.getBoundingClientRect(); return { name: element.getAttribute('aria-label') || element.textContent.trim().replace(/\s+/g, ' ').slice(0, 28) || element.id, left: r.left, top: r.top, right: r.right, bottom: r.bottom } })
+    const regions = [...document.querySelectorAll('.throttle-wrap label, .throttle-wrap > small, .stick-wrap > small, .roll-buttons small')]
+      .filter(element => getComputedStyle(element).display !== 'none' && element.getClientRects().length)
+      .map(element => { const r = element.getBoundingClientRect(); return { name: element.textContent.trim() || element.className, left: r.left, top: r.top, right: r.right, bottom: r.bottom } })
+    return { width, height, scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight,
+      canvas: { left: canvas.left, top: canvas.top, width: canvas.width, height: canvas.height, right: canvas.right, bottom: canvas.bottom }, controls, regions }
+  })
+  if (report.scrollWidth > report.width + 1 || report.scrollHeight > report.height + 1) throw new Error(`${label}: document overflow ${report.scrollWidth}×${report.scrollHeight} at ${report.width}×${report.height}`)
+  if (Math.abs(report.canvas.width - report.width) > 1 || Math.abs(report.canvas.height - report.height) > 1 || Math.abs(report.canvas.left) > 1 || Math.abs(report.canvas.top) > 1) throw new Error(`${label}: canvas is not fullscreen (${JSON.stringify(report.canvas)})`)
+  const outside = report.controls.filter(control => control.left < -1 || control.top < -1 || control.right > report.width + 1 || control.bottom > report.height + 1)
+  if (outside.length) throw new Error(`${label}: HUD controls outside viewport: ${JSON.stringify(outside)}`)
+  const overlaps = []
+  for (let i = 0; i < report.controls.length; i += 1) for (let j = i + 1; j < report.controls.length; j += 1) {
+    const a = report.controls[i], b = report.controls[j]
+    if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 3 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 3) overlaps.push([a.name, b.name])
+  }
+  if (overlaps.length) throw new Error(`${label}: interactive HUD controls overlap: ${JSON.stringify(overlaps)}`)
+  const regionOverlaps = []
+  for (const a of report.regions) for (const b of report.controls) {
+    if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 3 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 3) regionOverlaps.push([a.name, b.name])
+  }
+  if (regionOverlaps.length) throw new Error(`${label}: HUD labels overlap interactive controls: ${JSON.stringify(regionOverlaps)}`)
+  return report
+}
 
 try {
   await waitForServer()
-  // Prefer Playwright's bundled Chromium; fall back to an installed Google Chrome.
-  const args = ['--ignore-gpu-blocklist']
-  browser = await chromium.launch({ args }).catch(() => chromium.launch({ args, channel: 'chrome' }))
-  const errors = []
+  browser = await chromium.launch({ args: ['--ignore-gpu-blocklist'] }).catch(() => chromium.launch({ args: ['--ignore-gpu-blocklist'], channel: 'chrome' }))
+  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US' })
+  const page = await openGame(desktop)
+  await page.waitForTimeout(200)
+  await verifyLayout(page, 'desktop hangar')
+  await page.screenshot({ path: `${out}/01-hangar.png` })
+  let boot = await page.evaluate(() => ({ models: (window.__game.assets.generatedRocket ? 1 : 0) + (window.__game.assets.generatedPreviews?.length || 0), renderCalls: window.__game.engine.renderer.info.render.calls, scene: window.__game.sceneState }))
+  if (boot.scene !== '0' || boot.renderCalls < 1 || boot.models !== 3) throw new Error(`hangar/model boot incomplete: ${JSON.stringify(boot)}`)
 
-  const en = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'en-US' })
-  const page = await openGame(en, errors)
-  await page.screenshot({ path: `${out}/01-title-en.png` })
+  await page.click('[data-action="start-mission"]')
+  await page.waitForFunction(() => window.__game.sceneState === '1A')
+  await page.waitForFunction(() => window.__game.assets.generatedPreviews.filter(preview => preview.root.visible).length === 1)
+  await verifyLayout(page, 'payload inspection')
+  await page.screenshot({ path: `${out}/02-payload-inspection.png` })
+  await page.click('[data-action="launch"]')
+  await page.waitForFunction(() => window.__game.sceneState === '1B')
+  const fuelBefore = await page.evaluate(() => window.__game.getSnapshot().flight.fuelPercent)
+  await page.waitForTimeout(1200)
+  const ascent = await page.evaluate(() => window.__game.getSnapshot().flight)
+  if (!(ascent.altitudeM > 0 && ascent.speedMps > 0 && ascent.fuelPercent < fuelBefore)) throw new Error(`ascent did not integrate thrust/fuel: ${JSON.stringify({ fuelBefore, altitude: ascent.altitudeM, speed: ascent.speedMps, fuel: ascent.fuelPercent })}`)
+  await verifyLayout(page, 'tower launch')
+  await page.screenshot({ path: `${out}/03-tower-launch.png` })
+  await page.click('[data-action="stage"]')
+  const staged = await page.evaluate(() => window.__game.getSnapshot().flight.staged)
+  if (!staged) throw new Error('booster stage separation did not update flight state')
+  await page.click('[data-action="scan"]')
+  if (!(await page.locator('#radar-tag').evaluate(element => element.classList.contains('is-visible')))) throw new Error('radar scan did not show its active HUD pulse')
 
-  await page.click('[data-action="play"]')
-  await page.waitForSelector('[data-screen="hud"].is-active')
-  const before = await state(page)
-  await page.keyboard.down('KeyW')
-  await page.waitForTimeout(700)
-  await page.keyboard.press('Space')
-  await page.waitForTimeout(900)
-  await page.keyboard.up('KeyW')
-  await page.waitForTimeout(600)
-  await page.screenshot({ path: `${out}/02-gameplay.png` })
-  const after = await state(page)
-  const moved = Math.hypot(after.pos.x - before.pos.x, after.pos.z - before.pos.z)
-  if (after.mode !== 'playing') throw new Error(`expected playing, got ${after.mode}`)
-  if (!(after.run.timeLeft < before.run.timeLeft)) throw new Error('clock did not run')
-  if (moved < 2) throw new Error(`player barely moved (${moved.toFixed(2)} m)`)
-  console.log(`smoke: moved ${moved.toFixed(1)} m, clock ${after.run.timeLeft.toFixed(1)} s`)
-
-  await page.keyboard.press('Escape')
-  await page.waitForSelector('[data-screen="pause"].is-active')
-  await page.waitForTimeout(400)
-  await page.screenshot({ path: `${out}/03-pause.png` })
-  await page.click('[data-screen="pause"] [data-action="settings"]')
-  await page.waitForSelector('[data-screen="settings"].is-active')
-  await page.waitForTimeout(400)
-  await page.screenshot({ path: `${out}/04-settings.png` })
-  await page.keyboard.press('Escape')
-  await page.waitForSelector('[data-screen="pause"].is-active')
-  await page.waitForTimeout(300)
-  if ((await state(page)).mode !== 'paused') throw new Error('leaving Settings with Escape resumed the run')
-
-  // Results: finish the run through the real rules by collecting the remaining cores.
-  await page.evaluate(() => {
-    const { game } = window.__game
-    const cores = game['cores']
-    game.resume()
-    for (const p of cores.remaining()) {
-      game['player'].teleport(p)
-      game.step(1 / 60)
-    }
+  const scenes = [
+    ['1C', 'aerial pad'], ['2', 'orbital evasion'], ['3', 'telemetry debrief'],
+    ['0', 'hangar'], ['1A', 'payload inspection'], ['1B', 'tower launch'],
+  ]
+  for (const [state, label] of scenes) {
+    await page.evaluate(scene => window.__game.setSceneState(scene), state)
+    await page.waitForFunction(expected => window.__game.sceneState === expected, state)
+    await page.waitForTimeout(80)
+    await verifyLayout(page, `desktop ${label}`)
+    if (state === '3' && !(await page.locator('#debrief-panel').isVisible())) throw new Error('telemetry debrief panel did not appear in scene 3')
+    await page.screenshot({ path: `${out}/scene-${state.replace(/[^a-z0-9]/gi, '-')}.png` })
+  }
+  const status = await page.evaluate(() => {
+    const data = window.__game.getSnapshot()
+    return { models: (window.__game.assets.generatedRocket ? 1 : 0) + (window.__game.assets.generatedPreviews?.length || 0), hazards: data.hazards, asteroids: data.nasa?.asteroids?.length || 0, renderCalls: window.__game.engine.renderer.info.render.calls }
   })
-  await page.waitForSelector('[data-screen="results"].is-active', { timeout: 10_000 })
-  await page.waitForTimeout(1500)
-  await page.screenshot({ path: `${out}/05-results.png` })
-  const done = await state(page)
-  if (done.run.phase !== 'won') throw new Error(`expected a won run, got ${done.run.phase}`)
-  await en.close()
+  if (status.models !== 3 || status.hazards < 1 || status.asteroids < 1 || status.renderCalls < 10) throw new Error(`3D mission world or NASA/offline data incomplete: ${JSON.stringify(status)}`)
+  await desktop.close()
 
-  const zh = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'zh-CN' })
-  const zhPage = await openGame(zh, errors)
-  const lang = await zhPage.evaluate(() => document.documentElement.lang)
-  if (lang !== 'zh-CN') throw new Error(`browser language not detected (lang=${lang})`)
-  await zhPage.screenshot({ path: `${out}/06-title-zh.png` })
-  await zh.close()
-
-  const phone = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'zh-CN' })
-  const phonePage = await openGame(phone, errors)
-  await phonePage.tap('[data-action="play"]')
-  await phonePage.waitForSelector('[data-screen="hud"].is-active')
-  await phonePage.waitForTimeout(1200)
-  await phonePage.screenshot({ path: `${out}/07-phone-hud.png` })
-  await phone.close()
-
-  if (errors.length) throw new Error(`console errors:\n  ${errors.join('\n  ')}`)
-  await browser.close()
-  cleanup()
-  console.log(`smoke: OK — screenshots in ${out}/`)
-} catch (err) {
-  await fail(err?.message ?? String(err))
+  for (const size of [{ width: 390, height: 844, name: 'phone portrait' }, { width: 844, height: 390, name: 'phone landscape' }]) {
+    const context = await browser.newContext({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-US' })
+    const mobilePage = await openGame(context)
+    await verifyLayout(mobilePage, `${size.name} hangar`)
+    if (size.name === 'phone landscape') await mobilePage.selectOption('#destination-select', 'MOON')
+    await mobilePage.tap('[data-action="start-mission"]')
+    await mobilePage.tap('[data-action="launch"]')
+    await mobilePage.waitForTimeout(180)
+    if (size.name === 'phone landscape') {
+      await mobilePage.tap('[data-action="deploy"]')
+      await mobilePage.waitForFunction(() => window.__game.getSnapshot().orbitActive)
+      const journey = await mobilePage.evaluate(() => ({ destination: window.__game.getSnapshot().destination, distance: window.__game.assets.orbitCraft.position.distanceTo(window.__game.assets.destinationTarget), hud: document.getElementById('destination-state').textContent }))
+      if (journey.destination !== 'MOON' || journey.hud !== 'MOON' || journey.distance >= 234.2) throw new Error(`selected Moon Gateway did not route the payload: ${JSON.stringify(journey)}`)
+    } else await mobilePage.tap('[data-action="scan"]')
+    await mobilePage.evaluate(() => window.__game.setSceneState('2'))
+    await verifyLayout(mobilePage, `${size.name} orbital HUD`)
+    await mobilePage.screenshot({ path: `${out}/${size.name.replace(' ', '-')}-hud.png` })
+    await context.close()
+  }
+  if (errors.length) throw new Error(`local browser errors:\n  ${errors.join('\n  ')}`)
+  await browser.close(); cleanup()
+  console.log(`smoke: OK — ascent, staging, radar, six camera states, ${status.models} GLBs, ${status.asteroids} NASA/offline NEOs and full-screen layout at desktop and 2 phone sizes; evidence in ${out}/`)
+} catch (error) {
+  await fail(error?.message ?? String(error))
 }

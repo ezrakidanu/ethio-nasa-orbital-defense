@@ -1,6 +1,51 @@
 {
   "version": 2,
-  "groups": {},
+  "groups": {
+    "mission-identity": {
+      "name": "Mission Identity",
+      "order": 20
+    },
+    "spacecraft": {
+      "name": "Spacecraft Fleet",
+      "order": 10
+    }
+  },
   "bundles": {},
-  "assets": {}
+  "assets": {
+    "assets/models/ethio-deep-space-probe.glb": {
+      "path": "/manus-storage/game/sha256/cdf84999b18b6e99fbe3eaeaa132b741b59c08cf62b8f2b7056d94cd17e9a9e7.glb",
+      "sha256": "sha256:cdf84999b18b6e99fbe3eaeaa132b741b59c08cf62b8f2b7056d94cd17e9a9e7",
+      "size": 1149984,
+      "assetType": "model",
+      "groupId": "spacecraft"
+    },
+    "assets/models/etrrs-1-satellite.glb": {
+      "path": "/manus-storage/game/sha256/77f05b450c8e2dd9cffc9b71f9ec18cbc265979a8af7a5d524ba260048a3599e.glb",
+      "sha256": "sha256:77f05b450c8e2dd9cffc9b71f9ec18cbc265979a8af7a5d524ba260048a3599e",
+      "size": 1339052,
+      "assetType": "model",
+      "groupId": "spacecraft"
+    },
+    "assets/models/sls-launch-vehicle.glb": {
+      "path": "/manus-storage/game/sha256/d35dae02d8ed997a3c54773c3b0ecede0c974558170b91fd1de976903f5450ee.glb",
+      "sha256": "sha256:d35dae02d8ed997a3c54773c3b0ecede0c974558170b91fd1de976903f5450ee",
+      "size": 1153412,
+      "assetType": "model",
+      "groupId": "spacecraft"
+    },
+    "assets/share/favicon.png": {
+      "path": "/manus-storage/game/sha256/46cbf247fbc4dc56a65874a81b70885252fe46643a7c577b266e05464ede8654.png",
+      "sha256": "sha256:46cbf247fbc4dc56a65874a81b70885252fe46643a7c577b266e05464ede8654",
+      "size": 814,
+      "assetType": "image",
+      "groupId": "mission-identity"
+    },
+    "assets/share/og.png": {
+      "path": "/manus-storage/game/sha256/005bbcde4fd3f3bae2aad65c474f4c76be8572e3bb0658221a62b6d5faa0552b.png",
+      "sha256": "sha256:005bbcde4fd3f3bae2aad65c474f4c76be8572e3bb0658221a62b6d5faa0552b",
+      "size": 5261287,
+      "assetType": "image",
+      "groupId": "mission-identity"
+    }
+  }
 }

@@ -2,16 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#1b1838" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#020610" />
+    <meta name="description" content="ETHIO-NASA: Orbital Defense — command an SLS launch, deploy satellites, and defend Earth orbit." />
     <title>ETHIO-NASA: Orbital Defense</title>
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="preload" href="./fonts/ManusCC0-Bold.ttf" as="font" type="font/ttf" crossorigin />
-    <link rel="preload" href="./fonts/ManusCC0-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="icon" type="image/png" href="./assets/share/favicon.png" />
   </head>
   <body>
-    <canvas id="game"></canvas>
-    <div id="ui"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="canvas-container"><canvas id="game" aria-label="ETHIO-NASA 3D orbital flight simulation"></canvas></div>
+    <div id="ui-overlay" aria-live="polite"></div>
+    <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
