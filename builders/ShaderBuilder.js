@@ -11,6 +11,7 @@ export function createAtmosphereShader(radius) {
       uMie: { value: new THREE.Color('#0284c7') },
       uSunDirection: { value: new THREE.Vector3(-0.7, 0.35, 0.5).normalize() },
       uOpacity: { value: 0.82 },
+      uBloom: { value: 0.35 },
     },
     vertexShader: `
       varying vec3 vWorldPosition;
@@ -28,6 +29,7 @@ export function createAtmosphereShader(radius) {
       uniform vec3 uMie;
       uniform vec3 uSunDirection;
       uniform float uOpacity;
+      uniform float uBloom;
       varying vec3 vWorldPosition;
       varying vec3 vNormalWorld;
       void main() {
@@ -37,8 +39,8 @@ export function createAtmosphereShader(radius) {
         float rayleighPhase = 0.35 + 0.65 * pow(max(dot(viewDir, -uSunDirection), 0.0), 2.0);
         float miePhase = pow(max(dot(viewDir, -uSunDirection), 0.0), 18.0);
         float altitudeFade = 1.0 - smoothstep(0.0, 100000.0, uAltitude);
-        vec3 color = uRayleigh * rim * rayleighPhase + uMie * miePhase * 0.42;
-        float alpha = clamp(rim * uOpacity * altitudeFade + miePhase * 0.12, 0.0, 0.86);
+        vec3 color = (uRayleigh * rim * rayleighPhase + uMie * miePhase * 0.42) * (1.0 + uBloom * rim * 0.85);
+        float alpha = clamp(rim * uOpacity * altitudeFade + miePhase * (0.12 + uBloom * 0.08), 0.0, 0.9);
         gl_FragColor = vec4(color, alpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

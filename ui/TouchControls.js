@@ -1,7 +1,8 @@
 export class TouchControls {
-  constructor(root, actions) {
+  constructor(root, actions, settings = null) {
     this.root = root
     this.actions = actions
+    this.settings = settings
     this.rotation = { pitch: 0, yaw: 0, roll: 0 }
     this.throttle = 0
     this.pointerId = null
@@ -50,7 +51,8 @@ export class TouchControls {
       if (code === 'KeyR') this.actions('scan')
       if (code === 'KeyC') this.actions('camera')
       if (code === 'KeyB') this.actions('deploy')
-      if (code === 'Escape') this.actions('debrief')
+      if (code === 'Escape') this.actions('pause')
+      if (code === 'KeyM') this.actions('camera-state', '5')
     }, { passive: false })
     window.addEventListener('keyup', event => this.keys.delete(event.code))
     window.addEventListener('blur', () => this.keys.clear())
@@ -67,7 +69,21 @@ export class TouchControls {
     if (this.keys.has('ArrowUp')) this.throttle = Math.min(1, this.throttle + dt * 0.35)
     if (this.keys.has('ArrowDown')) this.throttle = Math.max(0, this.throttle - dt * 0.35)
     if (this.slider && document.activeElement !== this.slider) this.slider.value = String(Math.round(this.throttle * 100))
-    return { ...this.rotation, throttle: this.throttle }
+    const settings = this.settings?.getAll?.() || {}
+    const deadzone = Number.isFinite(settings.deadzone) ? settings.deadzone : 0.08
+    const sensitivity = Number.isFinite(settings.sensitivity) ? settings.sensitivity : 1
+    const apply = (value, inverted) => {
+      const magnitude = Math.abs(value)
+      if (magnitude <= deadzone) return 0
+      const mapped = Math.min(1, (magnitude - deadzone) / Math.max(0.001, 1 - deadzone)) * sensitivity
+      return Math.max(-1, Math.min(1, Math.sign(value) * mapped * (inverted ? -1 : 1)))
+    }
+    return {
+      pitch: apply(this.rotation.pitch, settings.invertPitch),
+      yaw: apply(this.rotation.yaw, settings.invertYaw),
+      roll: apply(this.rotation.roll, settings.invertRoll),
+      throttle: this.throttle,
+    }
   }
 
   setThrottle(value) {

@@ -48,10 +48,10 @@ describe('orbital power and scene system', () => {
     expect(orbital.shields).toBeLessThan(50)
   })
 
-  it('maps all six required camera states to finite smoothed positions', () => {
+  it('maps the six original and two added camera states to finite smoothed positions', () => {
     const camera = new THREE.PerspectiveCamera(56, 16 / 9, 0.1, 2000)
     const controller = new CameraController(camera)
-    expect(CAMERA_STATES.map(s => s.id)).toEqual(['0', '1A', '1B', '1C', '2', '3'])
+    expect(CAMERA_STATES.map(s => s.id)).toEqual(['0', '1A', '1B', '1C', '2', '3', '4', '5'])
     for (const state of CAMERA_STATES) {
       controller.setState(state.id)
       controller.update(0.05, { rocket: new THREE.Vector3(0, 10, 0), payload: new THREE.Vector3(0, 35, 0), orbit: new THREE.Vector3(38, -28, 0), velocity: new THREE.Vector3(0, 0, 1), time: 1 })

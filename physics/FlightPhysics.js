@@ -14,6 +14,8 @@ export class FlightPhysics {
     this.velocity = new THREE.Vector3(0, 0, 0)
     this.acceleration = new THREE.Vector3(0, 0, 0)
     this.fuel = FLIGHT_CONSTANTS.fuelMass
+    this.dryMassKg = FLIGHT_CONSTANTS.dryMass
+    this.separatedStages = new Set()
     this.elapsed = 0
     this.throttle = 0
     this.pitch = 0
@@ -65,7 +67,7 @@ export class FlightPhysics {
     const fuelRate = FLIGHT_CONSTANTS.fuelMass / FLIGHT_CONSTANTS.burnSeconds
     const fuelUsed = Math.min(this.fuel, fuelRate * step * throttle)
     this.fuel = Math.max(0, this.fuel - fuelUsed)
-    const mass = FLIGHT_CONSTANTS.dryMass + this.fuel
+    const mass = this.dryMassKg + this.fuel
     if (this.fuel <= 0) this.burnedOut = true
     const thrust = (this.burnedOut ? 0 : (tuning.thrustN ?? FLIGHT_CONSTANTS.thrust) * throttle)
     const direction = new THREE.Vector3(
@@ -94,7 +96,16 @@ export class FlightPhysics {
     }
   }
 
-  separateStage() { this.staged = true }
+  separateStage(stage = 'boosters') {
+    const stageMass = { boosters: 480_000, 'lower-stage': 840_000, 'upper-stage': 110_000 }
+    if (!(stage in stageMass) || this.separatedStages.has(stage)) return false
+    this.separatedStages.add(stage)
+    this.dryMassKg = Math.max(30_000, this.dryMassKg - stageMass[stage])
+    if (stage === 'lower-stage') this.fuel = Math.min(this.fuel, FLIGHT_CONSTANTS.fuelMass * 0.16)
+    if (stage === 'upper-stage') this.fuel = 0
+    this.staged = this.separatedStages.has('boosters')
+    return true
+  }
   consumeMaxQCrossing() { const crossed = this.maxQCrossed; this.maxQCrossed = false; return crossed }
 
   snapshot() {
@@ -104,7 +115,9 @@ export class FlightPhysics {
       qPa: this.dynamicPressure, qKpa: this.dynamicPressure / 1000, maxQLimitPa: this.activeMaxQLimitPa ?? FLIGHT_CONSTANTS.maxQ,
       rho: FlightPhysics.density(this.position.y), gravity: FlightPhysics.gravity(this.position.y),
       fuelKg: this.fuel, fuelPercent: this.fuel / FLIGHT_CONSTANTS.fuelMass * 100,
-      massKg: FLIGHT_CONSTANTS.dryMass + this.fuel, throttle: this.throttle * 100,
+      massKg: this.dryMassKg + this.fuel, dryMassKg: this.dryMassKg,
+      twr: (this.burnedOut ? 0 : FLIGHT_CONSTANTS.thrust * this.throttle) / Math.max(1, (this.dryMassKg + this.fuel) * FlightPhysics.gravity(this.position.y)),
+      throttle: this.throttle * 100,
       pitch: this.pitch, yaw: this.yaw, roll: this.roll, elapsed: this.elapsed,
       maxQReached: this.maxQReached, staged: this.staged, burnedOut: this.burnedOut,
       position: this.position.clone(), velocity: this.velocity.clone(), acceleration: this.acceleration.clone(),

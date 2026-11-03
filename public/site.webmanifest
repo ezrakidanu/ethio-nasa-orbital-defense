@@ -1,0 +1,19 @@
+{
+  "name": "ETHIO-NASA: Orbital Defense",
+  "short_name": "ETHIO-NASA",
+  "description": "Landscape-first orbital flight, satellite deployment and asteroid defense.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#020610",
+  "theme_color": "#020610",
+  "icons": [
+    {
+      "src": "./assets/share/favicon.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

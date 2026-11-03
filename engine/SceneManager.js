@@ -20,14 +20,35 @@ export class SceneManager {
     this.stormIntensity = 0
     this.launchComplex = new THREE.Group()
     this.spaceEnvironment = new THREE.Group()
-    this.scene.add(this.launchComplex, this.spaceEnvironment)
+    this.showroomWorld = new THREE.Group()
+    this.showroomAnchor = new THREE.Vector3(27, 18, -8)
+    this.showroomWorld.position.copy(this.showroomAnchor)
+    this.scene.add(this.launchComplex, this.spaceEnvironment, this.showroomWorld)
+    const starPositions = new Float32Array(1400 * 3)
+    let seed = 49157
+    const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 }
+    for (let index = 0; index < 1400; index += 1) {
+      const radius = 90 + random() * 220
+      const angle = random() * Math.PI * 2
+      const y = random() * 2 - 1
+      const planar = Math.sqrt(1 - y * y)
+      starPositions[index * 3] = radius * planar * Math.cos(angle)
+      starPositions[index * 3 + 1] = radius * y
+      starPositions[index * 3 + 2] = radius * planar * Math.sin(angle)
+    }
+    const starGeometry = new THREE.BufferGeometry()
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+    this.showroomStars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: '#d7ecff', size: 0.8, sizeAttenuation: true, transparent: true, opacity: 0.82 }))
+    this.showroomWorld.add(this.showroomStars)
   }
 
   setState(id) {
     this.sceneState = String(id)
-    const orbital = this.sceneState === '2'
-    this.launchComplex.visible = !orbital
-    this.spaceEnvironment.visible = true
+    const home = this.sceneState === '0'
+    const orbital = this.sceneState === '2' || this.sceneState === '5'
+    this.launchComplex.visible = !home && !orbital
+    this.spaceEnvironment.visible = !home
+    this.showroomWorld.visible = home
     this.ambient.intensity = orbital ? 0.3 : 1.25
     this.scene.fog = orbital ? null : new THREE.FogExp2('#071425', 0.0018)
   }

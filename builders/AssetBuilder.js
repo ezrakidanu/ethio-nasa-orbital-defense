@@ -72,6 +72,10 @@ export class AssetBuilder {
     this.selectedSatellite = 'ETRSS-1'
     this.satelliteFleet = new Map()
     this.boosters = new THREE.Group()
+    this.lowerStage = new THREE.Group()
+    this.upperStage = new THREE.Group()
+    this.fairingHalves = []
+    this.fairingOpening = false; this.fairingProgress = 0; this.fairingsOpened = false; this.fairingJustOpened = false
     this.rocket = new THREE.Group()
     this.rocketDecals = new THREE.Group()
     this.payload = new THREE.Group()
@@ -89,6 +93,10 @@ export class AssetBuilder {
     this.atmosphere = null
     this.earth = null
     this.radarOrigin = new THREE.Vector3(37, -32, 0)
+    this.showroomWorld = sceneManager.showroomWorld || this.scene
+    this.showroomModel = null; this.showroomDrag = { x: 0, y: 0 }; this.showroomIdle = 0
+    this.detachedParts = []; this.jettisonTarget = null; this.ascentStage = 0
+    this.graphicsSettings = { particleCount: 700, atmosphereBloom: 1 }; this.orbitPrediction = null
   }
 
   build() {
@@ -154,30 +162,33 @@ export class AssetBuilder {
   buildRocket() {
     this.rocket.position.set(0, 0, 0); this.launchComplex.add(this.rocket)
     this.proceduralRocket = new THREE.Group(); this.rocket.add(this.proceduralRocket)
-    addCylinder(this.proceduralRocket, 1.08, 1.42, 26, '#e8752a', [0, 15, 0], 24, { material: orange, metalness: 0.45, roughness: 0.42 })
-    addCylinder(this.proceduralRocket, 0.88, 1.08, 8.2, '#293746', [0, 32.1, 0], 20, { material: mat('#273444', 0.75, 0.32) })
-    const fairing = new THREE.Mesh(new THREE.ConeGeometry(0.91, 4.4, 20), white); fairing.position.set(0, 38.3, 0); fairing.castShadow = true; this.proceduralRocket.add(fairing)
-    this.boosters.clear()
+    this.lowerStage = new THREE.Group(); this.lowerStage.name = 'lowerStage'; this.proceduralRocket.add(this.lowerStage)
+    addCylinder(this.lowerStage, 1.08, 1.42, 26, '#e8752a', [0, 15, 0], 24, { material: orange, metalness: 0.45, roughness: 0.42 })
+    this.upperStage = new THREE.Group(); this.upperStage.name = 'upperStage'; this.proceduralRocket.add(this.upperStage)
+    addCylinder(this.upperStage, 0.88, 1.08, 8.2, '#293746', [0, 32.1, 0], 20, { material: mat('#273444', 0.75, 0.32) })
+    this.fairingHalves = []
+    for (const side of [-1, 1]) {
+      const half = new THREE.Group(); half.name = side < 0 ? 'fairing-left' : 'fairing-right'; half.position.set(side * 0.455, 38.3, 0)
+      const geometry = new THREE.ConeGeometry(0.91, 4.4, 20, 1, false, side < 0 ? 0 : Math.PI, Math.PI)
+      const mesh = new THREE.Mesh(geometry, white); mesh.scale.x = 0.52; mesh.castShadow = true; half.add(mesh)
+      half.userData.hinge = new THREE.Vector3(-side * 0.455, 38.3, 0); this.upperStage.add(half); this.fairingHalves.push(half)
+    }
+    this.boosters = new THREE.Group(); this.boosters.name = 'boosters'; this.proceduralRocket.add(this.boosters)
+    this.boosterPair = []
     for (const x of [-1.9, 1.9]) {
-      addCylinder(this.boosters, 0.58, 0.8, 25, '#e2e8ec', [x, 14.8, 0], 18, { material: white })
-      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.59, 2.2, 16), white); nose.position.set(x, 28.4, 0); this.boosters.add(nose)
-      addCylinder(this.boosters, 0.28, 0.72, 2.6, '#414d58', [x, 1.7, 0], 16, { material: metal })
+      const booster = new THREE.Group(); booster.name = x < 0 ? 'booster-left' : 'booster-right'; booster.position.x = x; this.boosters.add(booster); this.boosterPair.push(booster)
+      addCylinder(booster, 0.58, 0.8, 25, '#e2e8ec', [0, 14.8, 0], 18, { material: white })
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.59, 2.2, 16), white); nose.position.set(0, 28.4, 0); booster.add(nose)
+      addCylinder(booster, 0.28, 0.72, 2.6, '#414d58', [0, 1.7, 0], 16, { material: metal })
     }
-    this.proceduralRocket.add(this.boosters)
-    for (let i = 0; i < 4; i++) {
-      const angle = i * Math.PI / 2 + Math.PI / 4
-      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 2.6, 16), mat('#555e66', 0.8, 0.3, { side: THREE.DoubleSide }))
-      nozzle.position.set(Math.cos(angle) * 0.77, 1.15, Math.sin(angle) * 0.77); nozzle.rotation.x = Math.PI; nozzle.castShadow = true; this.proceduralRocket.add(nozzle)
-    }
-    for (let y of [7, 24, 29]) {
-      const band = addCylinder(this.proceduralRocket, 1.14, 1.46, 0.22, '#f5c266', [0, y, 0], 24, { metalness: 0.72, roughness: 0.27 })
-      band.scale.set(1, 1, 1)
-    }
-    this.rocketDecals = new THREE.Group(); this.rocketDecals.position.set(0, 0, 0); this.rocket.add(this.rocketDecals)
+    for (let i = 0; i < 4; i++) { const angle = i * Math.PI / 2 + Math.PI / 4; const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 2.6, 16), mat('#555e66', 0.8, 0.3, { side: THREE.DoubleSide })); nozzle.position.set(Math.cos(angle) * 0.77, 1.15, Math.sin(angle) * 0.77); nozzle.rotation.x = Math.PI; nozzle.castShadow = true; this.lowerStage.add(nozzle) }
+    for (const y of [7, 24]) addCylinder(this.lowerStage, 1.14, 1.46, 0.22, '#f5c266', [0, y, 0], 24, { metalness: 0.72, roughness: 0.27 })
+    addCylinder(this.upperStage, 1.14, 1.46, 0.22, '#f5c266', [0, 29, 0], 24, { metalness: 0.72, roughness: 0.27 })
+    this.rocketDecals = new THREE.Group(); this.rocket.add(this.rocketDecals)
     const insignia = makeTextDecal('ETHIO-NASA', 'ORBITAL DEFENSE'); insignia.position.set(0, 20, 1.44); insignia.scale.set(0.95, 0.44, 1); this.rocketDecals.add(insignia)
     const maker = makeTextDecal('MAKAVELI RECORDS', 'MISSION PARTNER'); maker.position.set(0, 25.3, 1.34); maker.scale.set(0.68, 0.23, 1); this.rocketDecals.add(maker)
     const payloadLabel = makeTextDecal('BASHA PACSON', 'FLIGHT SYSTEMS'); payloadLabel.position.set(1.34, 14, 0); payloadLabel.rotation.y = Math.PI / 2; payloadLabel.scale.set(0.62, 0.21, 1); this.rocketDecals.add(payloadLabel)
-    this.payload.position.set(0, 35, 0); this.rocket.add(this.payload)
+    this.payload.position.set(0, 35, 0); this.payload.name = 'payload'; this.rocket.add(this.payload)
     this.buildPadHoldDowns()
   }
 
@@ -194,6 +205,7 @@ export class AssetBuilder {
     this.satelliteFleet.set('ETHIO-DEEP-SPACE 1', this.makeProbe())
     for (const [name, group] of this.satelliteFleet) { group.visible = name === this.selectedSatellite; this.payload.add(group) }
     this.orbitCraft = new THREE.Group(); this.orbitCraft.visible = false; this.space.add(this.orbitCraft)
+    this.buildShowroom()
   }
 
   makeEtrss() {
@@ -316,7 +328,7 @@ export class AssetBuilder {
     for (const result of outputs) {
       if (result.status !== 'fulfilled') continue
       const { path, root } = result.value
-      if (path.includes('sls-launch')) { this.proceduralRocket.visible = false; root.position.y += 19; this.rocket.add(root); this.generatedRocket = root }
+      if (path.includes('sls-launch')) { root.visible = false; root.position.y += 19; this.rocket.add(root); this.generatedRocket = root }
       else if (path.includes('etrrs')) this.addGeneratedInspectionModel('ETRSS-1', root, 'MAKAVELI RECORDS')
       else if (path.includes('deep-space')) this.addGeneratedInspectionModel('ETHIO-DEEP-SPACE 1', root, 'BASHA PACSON')
     }
@@ -335,6 +347,35 @@ export class AssetBuilder {
     this.generatedPreviews.push({ name, target, root, procedural })
   }
 
+  buildShowroom() {
+    if (this.showroomModel?.parent) this.showroomModel.parent.remove(this.showroomModel)
+    const source = this.satelliteFleet.get(this.selectedSatellite)
+    if (!source || !this.showroomWorld) return null
+    this.showroomModel = source.clone(true); this.showroomModel.name = `showroom-${this.selectedSatellite}`
+    this.showroomModel.position.set(0, 0, 0); this.showroomModel.scale.setScalar(0.8); this.showroomWorld.add(this.showroomModel)
+    this.showroomModel.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true } })
+    return this.showroomModel
+  }
+
+  setShowroomSatellite(name) {
+    if (!this.satelliteFleet.has(name)) return false
+    this.selectSatellite(name); this.buildShowroom(); return true
+  }
+
+  rotateShowroom(dx, dy) {
+    if (!this.showroomModel) return false
+    this.showroomDrag.x += Number(dx) || 0; this.showroomDrag.y += Number(dy) || 0
+    this.showroomModel.rotation.y += (Number(dx) || 0) * 0.008
+    this.showroomModel.rotation.x = THREE.MathUtils.clamp(this.showroomModel.rotation.x + (Number(dy) || 0) * 0.008, -1.25, 1.25)
+    return true
+  }
+
+  getShowroomTarget() {
+    if (!this.showroomModel) return null
+    this.showroomModel.updateMatrixWorld(true)
+    return this.showroomModel.getWorldPosition(new THREE.Vector3())
+  }
+
   selectSatellite(name) {
     if (!this.satelliteFleet.has(name)) return false
     this.selectedSatellite = name
@@ -342,10 +383,102 @@ export class AssetBuilder {
     return true
   }
 
+  setGraphicsSettings({ particleCount, atmosphereBloom } = {}) {
+    if (Number.isFinite(particleCount)) {
+      const count = Math.round(THREE.MathUtils.clamp(particleCount, 350, 1800))
+      this.graphicsSettings.particleCount = count
+      for (const [key, points, color] of [['exhaust', this.exhaust, true], ['smoke', this.smoke, false]]) {
+        if (!points) continue
+        const old = points.geometry, positions = new Float32Array(count * 3), colors = color ? new Float32Array(count * 3) : null
+        for (let i = 0; i < count; i++) { if (colors) { colors[i*3] = 1; colors[i*3+1] = 0.26 + Math.random() * 0.45; colors[i*3+2] = 0.04 } }
+        const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3)); if (colors) geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+        points.geometry = geometry; old.dispose()
+      }
+    }
+    if (Number.isFinite(atmosphereBloom)) {
+      this.graphicsSettings.atmosphereBloom = THREE.MathUtils.clamp(atmosphereBloom, 0, 2)
+      const uniform = this.atmosphere?.material?.uniforms?.uBloom
+      if (uniform) uniform.value = this.graphicsSettings.atmosphereBloom
+    }
+    return { ...this.graphicsSettings }
+  }
+
+  getJettisonTarget() { return this.jettisonTarget ? { id: this.jettisonTarget.id, label: this.jettisonTarget.label, age: this.jettisonTarget.life, position: this.jettisonTarget.group.getWorldPosition(new THREE.Vector3()) } : null }
+
+  advanceFairingHinges(dt) {
+    if (!this.fairingOpening) return
+    this.fairingProgress = Math.min(1, this.fairingProgress + Math.max(0, dt) / 0.82)
+    const eased = this.fairingProgress * this.fairingProgress * (3 - 2 * this.fairingProgress)
+    this.fairingHalves.forEach((half, index) => {
+      const sign = index ? 1 : -1
+      half.rotation.z = sign * 1.12 * eased
+      half.position.x = sign * (0.455 + 0.34 * eased)
+    })
+    if (this.fairingProgress < 1) return
+    this.fairingOpening = false
+    this.fairingsOpened = true
+    for (let i = 0; i < this.fairingHalves.length; i++) {
+      const half = this.fairingHalves[i]
+      this._detach(half, `fairing-${i + 1}`, `Fairing half ${i + 1}`, new THREE.Vector3(i ? 1 : -1, 0.4, 0))
+    }
+    this.ascentStage = Math.max(this.ascentStage, 3)
+    this.fairingJustOpened = true
+  }
+
+  _detach(group, id, label, direction = new THREE.Vector3(1, 0.1, 0)) {
+    if (!group?.parent) return false
+    const world = group.getWorldPosition(new THREE.Vector3()); this.launchComplex.attach(group); group.position.copy(world)
+    direction.normalize(); const state = { id, label, group, velocity: direction.multiplyScalar(8), angular: new THREE.Vector3(0.45, 0.7, 0.25), life: 0 }
+    this.detachedParts.push(state); this.jettisonTarget = state; return true
+  }
+
   stageSeparation() {
-    this.boosters.visible = false
-    this.launchComplex.remove(this.boosters)
-    this.rocket.userData.staged = true
+    if (this.ascentStage === 2 && !this.fairingsOpened) {
+      if (this.fairingOpening) return { ok: false, pending: true, id: 'fairing-opening', label: 'Fairing hinges opening', nextLabel: 'FAIRING HINGES OPENING', complete: false, message: 'Fairing hinges are opening; wait for payload clearance', massKey: null }
+      this.fairingOpening = true
+      this.fairingProgress = 0
+      return { ok: true, pending: true, id: 'fairing-opening', label: 'Fairing hinge sequence', nextLabel: 'FAIRING HINGES OPENING', complete: false, message: 'Fairing hinges opening — payload deployment is interlocked', massKey: null }
+    }
+    if (this.fairingsOpened && this.ascentStage === 2) this.ascentStage = 3
+    const stages = [
+      () => { let did = false; for (let i = 0; i < this.boosterPair.length; i++) { const booster = this.boosterPair[i]; if (booster.parent) did = this._detach(booster, `booster-${i + 1}`, `Solid booster ${i + 1}`, new THREE.Vector3(i ? 1 : -1, 0.12, 0.1)) || did } return did ? ['boosters', 'Solid boosters'] : null },
+      () => this._detach(this.lowerStage, 'lower-stage', 'Lower stage', new THREE.Vector3(0.5, -0.2, 0.1)) ? ['lower-stage', 'Lower stage'] : null,
+      () => null,
+      () => { if (!this.payload.userData.released) return ['blocked', 'Payload must be deployed before upper-stage separation']; return this._detach(this.upperStage, 'upper-stage', 'Upper stage', new THREE.Vector3(0.2, -0.3, 0.3)) ? ['upper-stage', 'Upper stage'] : null }
+    ]
+    while (this.ascentStage < stages.length) { const result = stages[this.ascentStage](); if (result) { const [id, label] = result; if (id !== 'blocked') this.ascentStage++; return { ok: id !== 'blocked', id, label, nextLabel: ['Solid boosters', 'Lower stage', 'Payload fairings', 'Upper stage', 'Complete'][this.ascentStage] || 'Complete', complete: id === 'upper-stage', message: id === 'blocked' ? label : `${label} jettisoned`, massKey: id === 'boosters' ? 'boosters' : id } } }
+    return { ok: false, id: 'complete', label: 'Complete', nextLabel: 'Complete', complete: true, message: 'All separation events complete', massKey: null }
+  }
+
+  completeAscentSeparation() {
+    const result = []
+    while (this.ascentStage < 3) {
+      const step = this.stageSeparation()
+      if (!step.ok || step.pending) return { ok: false, pending: Boolean(step.pending), complete: false, steps: result, message: step.message }
+      result.push(step)
+    }
+    return { ok: true, complete: true, steps: result, nextLabel: 'Upper stage', message: 'Boosters, lower stage, and both fairing halves separated; upper stage retained' }
+  }
+
+  setOrbitPrediction(points, elements = {}) {
+    if (this.orbitPrediction) { this.space.remove(this.orbitPrediction.group); this.orbitPrediction.group.traverse(n => { n.geometry?.dispose(); if (Array.isArray(n.material)) n.material.forEach(m => m.dispose()); else n.material?.dispose() }) }
+    const group = new THREE.Group(); group.name = 'predicted-orbit'
+    const earthScale = 33 / 6_371_000
+    const vectors = (points || []).map(p => {
+      const value = p?.isVector3 ? p : new THREE.Vector3(p.x ?? p[0] ?? 0, p.y ?? p[1] ?? 0, p.z ?? p[2] ?? 0)
+      return value.clone().multiplyScalar(earthScale)
+    })
+    if (vectors.length > 2) { const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(vectors), new THREE.LineBasicMaterial({ color: '#65e0ff', transparent: true, opacity: 0.9 })); group.add(line) }
+    const markers = []
+    if (vectors.length > 2) {
+      const ranked = [...vectors].sort((a, b) => a.lengthSq() - b.lengthSq())
+      for (const [key, point] of [['periapsis', ranked[0]], ['apoapsis', ranked.at(-1)]]) {
+        const marker = new THREE.Mesh(new THREE.SphereGeometry(0.68, 12, 8), new THREE.MeshBasicMaterial({ color: key === 'apoapsis' ? '#f6c453' : '#6affb1' }))
+        marker.position.copy(point); marker.name = key; group.add(marker); markers.push(marker)
+      }
+    }
+    group.position.copy(this.earthGroup?.position || new THREE.Vector3(0, -33, 0))
+    this.space.add(group); this.orbitPrediction = { group, markers }; return group
   }
 
   launch() { this.exhaust.visible = true; this.flameLight.intensity = 24 }
@@ -354,6 +487,7 @@ export class AssetBuilder {
     const craft = this.satelliteFleet.get(this.selectedSatellite)
     if (!craft) return null
     this.payload.remove(craft)
+    this.payload.userData.released = true
     this.space.add(craft)
     craft.visible = true
     craft.position.copy(worldPosition || this.radarOrigin)
@@ -400,6 +534,9 @@ export class AssetBuilder {
 
   update(dt, flight, orbit, cameraState = '0', stormIntensity = 0) {
     this.elapsed += dt
+    this.advanceFairingHinges(dt)
+    if (this.showroomModel) { this.showroomIdle += dt; if (this.showroomWorld.visible) this.showroomModel.rotation.y += dt * 0.11 }
+    for (let i = this.detachedParts.length - 1; i >= 0; i--) { const part = this.detachedParts[i]; part.life += dt; part.group.position.addScaledVector(part.velocity, dt); part.group.rotation.x += part.angular.x * dt; part.group.rotation.y += part.angular.y * dt; if (part.life > 8) { this.launchComplex.remove(part.group); this.detachedParts.splice(i, 1); if (this.jettisonTarget === part) this.jettisonTarget = this.detachedParts.at(-1) || null } }
     if (this.atmosphere) this.atmosphere.material.uniforms.uAltitude.value = flight?.altitudeM || 0
     if (this.earth) this.earth.rotation.y += dt * 0.012
     if (this.cloudLayer) this.cloudLayer.rotation.y -= dt * 0.018
@@ -411,6 +548,13 @@ export class AssetBuilder {
     }
     const rocketY = Math.max(0, flight?.altitudeM || 0) / 4300
     this.rocket.position.set((flight?.position.x || 0) / 9000, rocketY, (flight?.position.z || 0) / 9000)
+    const maxQLimit = Math.max(1, flight?.maxQLimitPa || 38_000)
+    const qStress = THREE.MathUtils.clamp((flight?.qPa || 0) / maxQLimit, 0, 1)
+    if (qStress > 0.45) {
+      const shake = (qStress - 0.45) * 0.18
+      this.rocket.position.x += Math.sin(this.elapsed * 87) * shake
+      this.rocket.position.z += Math.cos(this.elapsed * 97) * shake
+    }
     this.yawQuaternion.setFromAxisAngle(this.yawAxis, flight?.yaw || 0)
     this.pitchQuaternion.setFromAxisAngle(this.pitchAxis, flight?.pitch || 0)
     this.rollQuaternion.setFromAxisAngle(this.rollAxis, flight?.roll || 0)
@@ -421,7 +565,8 @@ export class AssetBuilder {
       for (const child of preview.procedural) child.visible = !showModel
     }
     this.exhaust.visible = Boolean(flight?.launched && !flight?.burnedOut && flight?.throttle > 0 && cameraState !== '2')
-    this.smoke.visible = Boolean(flight?.launched && (flight?.altitudeM || 0) < 50_000 && cameraState !== '2')
+    this.smoke.visible = Boolean((this.detachedParts.length || (flight?.launched && (flight?.altitudeM || 0) < 50_000)) && cameraState !== '2')
+    if (this.smoke && this.detachedParts.length) { this.smoke.visible = true; const p = this.smoke.geometry.attributes.position; const count = Math.min(p.count, this.detachedParts.length * 28); for (let i = 0; i < count; i++) { const part = this.detachedParts[Math.floor(i / 28) % this.detachedParts.length]; const v = part.group.position; const a = (i % 28) * 2.399 + this.elapsed; const r = 0.3 + (i % 7) * 0.12; p.setXYZ(i, v.x + Math.cos(a) * r, v.y + (i % 6) * 0.16, v.z + Math.sin(a) * r) } p.needsUpdate = true }
     if (this.flameLight) this.flameLight.intensity = this.exhaust.visible ? 18 + Math.sin(this.elapsed * 25) * 4 : 0
     if (this.exhaust?.visible) {
       const p = this.exhaust.geometry.attributes.position

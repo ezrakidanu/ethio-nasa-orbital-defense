@@ -1,6 +1,13 @@
+import { Capacitor } from '@capacitor/core'
+import { ScreenOrientation } from '@capacitor/screen-orientation'
+
 // Keep the starter's development-only Tweak bridge available in Preview while the gameplay
 // runtime uses the requested modular JavaScript paths (engine/, physics/, builders/, api/, ui/).
 async function boot(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try { await ScreenOrientation.lock({ orientation: 'landscape' }) }
+    catch (error) { console.warn('Native landscape lock unavailable; relying on the Android activity configuration.', error) }
+  }
   if (import.meta.env.DEV) {
     const [{ registerGameTuning }, { tuning }, { CONFIG }] = await Promise.all([
       import('../scripts/manus-tuning/adapter.js'),

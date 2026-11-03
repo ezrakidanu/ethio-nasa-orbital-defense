@@ -50,6 +50,16 @@ export class OrbitalMechanics {
     return this.snapshot()
   }
 
+  setState(position, velocity) {
+    if (!position || !velocity) return false
+    const values = [position.x, position.y, position.z, velocity.x, velocity.y, velocity.z]
+    if (!values.every(Number.isFinite) || Math.hypot(position.x, position.y, position.z) <= EARTH_RADIUS) return false
+    this.position.copy(position)
+    this.velocity.copy(velocity)
+    this.elapsed = 0
+    return true
+  }
+
   snapshot() {
     return {
       className: this.className, position: this.position.clone(), velocity: this.velocity.clone(),

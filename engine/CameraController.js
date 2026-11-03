@@ -7,6 +7,8 @@ export const CAMERA_STATES = Object.freeze([
   { id: '1C', label: 'SATURN V PAD AERIAL' },
   { id: '2', label: 'ORBITAL EVASION' },
   { id: '3', label: 'TELEMETRY DEBRIEF' },
+  { id: '4', label: 'CINEMATIC FLIGHT' },
+  { id: '5', label: 'KEPLERIAN ORBIT MAP' },
 ])
 
 export class CameraController {
@@ -33,6 +35,7 @@ export class CameraController {
 
   update(dt, targets = {}) {
     const rocket = targets.rocket || new THREE.Vector3(0, 14, 0)
+    const showroom = targets.showroom || new THREE.Vector3(27, 18, -8)
     const payload = targets.payload || rocket.clone().add(new THREE.Vector3(0, 16, 0))
     const orbit = targets.orbit || new THREE.Vector3(38, -28, 0)
     const velocity = targets.velocity || new THREE.Vector3(0, 0, 1)
@@ -46,15 +49,22 @@ export class CameraController {
     if (s !== '1C') this.camera.up.set(0, 1, 0)
     if (s === '0') {
       this.orbitAngle += dt * 0.13
-      this.desiredTarget.copy(rocket).add(new THREE.Vector3(0, 12, 0))
-      this.desiredPosition.copy(this.desiredTarget).add(new THREE.Vector3(Math.sin(this.orbitAngle) * distance * 6.56, distance * 2.81, Math.cos(this.orbitAngle) * distance * 6.56))
+      this.desiredTarget.copy(showroom)
+      this.desiredPosition.copy(showroom).add(new THREE.Vector3(Math.sin(this.orbitAngle) * distance * 5.2, distance * 2.2, Math.cos(this.orbitAngle) * distance * 5.2))
     } else if (s === '1A') {
       this.orbitAngle += dt * 0.38
       this.desiredTarget.copy(payload)
       this.desiredPosition.copy(payload).add(new THREE.Vector3(Math.sin(this.orbitAngle) * distance * 1.875, distance * 0.625, Math.cos(this.orbitAngle) * distance * 1.875))
     } else if (s === '1B') {
-      this.desiredTarget.copy(rocket).add(new THREE.Vector3(0, 20, 0))
-      this.desiredPosition.copy(rocket).add(new THREE.Vector3(-distance * 5, distance * 1.1, distance * 2.5))
+      const eject = targets.jettison
+      const ejectPosition = eject?.position?.isVector3 ? eject.position : null
+      if (ejectPosition && Number.isFinite(eject.age) && eject.age < 2.1) {
+        this.desiredTarget.copy(ejectPosition)
+        this.desiredPosition.copy(ejectPosition).add(new THREE.Vector3(-distance * 2.1, distance * 0.8, distance * 1.8))
+      } else {
+        this.desiredTarget.copy(rocket).add(new THREE.Vector3(0, 20, 0))
+        this.desiredPosition.copy(rocket).add(new THREE.Vector3(-distance * 5, distance * 1.1, distance * 2.5))
+      }
     } else if (s === '1C') {
       this.desiredTarget.copy(rocket)
       this.desiredPosition.copy(rocket).add(new THREE.Vector3(0, distance * 11.56, 0.05))
@@ -65,6 +75,14 @@ export class CameraController {
       this.desiredTarget.copy(orbit)
       this.desiredPosition.copy(orbit).addScaledVector(followDir, -distance * 3.75).add(new THREE.Vector3(0, distance * 1.4, 0))
       this.camera.up.set(0, 1, 0)
+    } else if (s === '4') {
+      this.orbitAngle += dt * 0.16
+      this.desiredTarget.copy(orbit).lerp(rocket, 0.58)
+      this.desiredPosition.copy(this.desiredTarget).add(new THREE.Vector3(Math.sin(this.orbitAngle) * distance * 15, 28 + distance * 3, Math.cos(this.orbitAngle) * distance * 15))
+    } else if (s === '5') {
+      this.desiredTarget.set(0, -33, 0)
+      this.desiredPosition.set(0, 175, 0.1)
+      this.camera.up.set(0, 0, -1)
     } else {
       this.desiredTarget.copy(orbit).lerp(rocket, 0.45)
       this.desiredPosition.copy(this.desiredTarget).add(new THREE.Vector3(55, 36, 58))
