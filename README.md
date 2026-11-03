@@ -84,7 +84,7 @@ On macOS with Xcode/CocoaPods, add and sync iOS with `pnpm exec cap add ios` and
 
 Public repository: [github.com/ezrakidanu/ethio-nasa-orbital-defense](https://github.com/ezrakidanu/ethio-nasa-orbital-defense).
 
-The standalone `ethio-nasa-orbital-defense.zip` contains the full source, lockfile, three GLB spacecraft models, project-sharing artwork, production web output, synced Android wrapper, tests, build scripts, and smoke evidence. Registered model and artwork files are present in the archive and tracked in the public repository for an independently reproducible build.
+The standalone `ethio-nasa-orbital-defense.zip` contains the full source, lockfile, three GLB spacecraft models, project-sharing artwork, production web output, synced Android wrapper, compiled debug APK, tests, build scripts, and smoke evidence. Registered model and artwork files are present in the archive and tracked in the public repository for an independently reproducible build.
 
 ## Verification
 
