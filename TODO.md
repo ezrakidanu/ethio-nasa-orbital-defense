@@ -1,23 +1,43 @@
-# ETHIO-NASA: Orbital Defense — Build Outcomes
+# ETHIO-NASA: Orbital Defense — progress tracker
 
-## Existing mission core (completed)
+**Overall estimate: about 40% of the full master-compendium vision is implemented in prototype form.** This is an engineering estimate, not a measured completion metric. The current deliverable is a tested, playable first vertical slice—not a content-complete or production-polished simulator.
 
-- [x] **Fullscreen mobile WebGL viewport and HUD:** “Absolutely no scrolling webpages, text blogs, or vertical HTML container stacks.” Use a fixed fullscreen WebGL viewport, `html, body { width: 100vw; height: 100vh; margin: 0; padding: 0; overflow: hidden; background: #000; touch-action: none; }`; canvas fills the viewport. Layer UI in `#ui-overlay` with full-screen absolute positioning, pointer events disabled except interactive controls. Ensure the game UI fits mobile viewports and does not create document overflow.
-- [x] **Procedural Ethiopian launch complex and spacecraft:** Build SLS-class rocket with solid boosters, orange core, RS-25 engine cluster and exhaust; SLS tower and launchpad; river landscape; waving procedural Ethiopian flag with green `#009A44`, yellow `#FED100`, red `#D80027`; ETHIO-NASA vehicle insignias; Makaveli Records and Basha Pacson decals on the vehicle/satellite panels; ETRSS-1, ET-SMART-RSS and ETHIO-DEEP-SPACE 1 spacecraft.
-- [x] **SFS2-style flight and orbital physics:** Implement `ρ(h)=1.225*exp(-h/8500)`, `Q=0.5*ρ*v²`, gravity variation `g(h)=g0*(Rearth/(Rearth+h))²`, drag `0.5*ρ*v²*Cd*A`, mass loss `m(t)=m_dry+m_fuel(t)`, thrust/drag/gravity net acceleration and real-time trajectory, pitch/yaw/roll, velocity and fuel telemetry. Trigger screen shake and the exact warning `WARNING: MAX-Q STRESS LIMIT REACHED` above the structural threshold. In orbit, integrate thruster inertia, solar-panel recharge alignment, battery drain and shields.
-- [x] **Atmosphere shader and scene transitions:** Implement custom GLSL Rayleigh/Mie atmospheric scattering with a cyan/blue horizon fading into deep-space black by 100 km, and smooth transitions across six states: State 0 Hangar View; State 1A Payload Inspection; State 1B SLS Tower Mount; State 1C Saturn V Pad Aerial View; State 2 Orbital Evasion; State 3 Telemetry Debrief Log. Debrief shows telemetry and mission performance.
-- [x] **NASA telemetry and radar:** Fetch DONKI solar-flare and NeoWs near-Earth asteroid data asynchronously with a 2500 ms timeout and CORS/error handling; parse flare classes, asteroid diameter and relative velocity; map hazards into orbital gameplay; provide offline fallback datasets; radar pulse highlights tracked hazards and targets.
-- [x] **Dynamic HUD and mobile controls:** Show altitude, velocity, Mach, Q-load/max-Q status, trajectory, throttle, solar power, battery, DONKI alert and tracked NEO data. Provide touch joystick controlling pitch/yaw/roll, continuous 0–100% throttle slider, stage separation, radar scan and camera switching. Include keyboard controls for desktop testing.
-- [x] **GitHub/Capacitor-ready deliverable:** Include Capacitor core/CLI/Android (and iOS) dependencies, config, web assets/build scripts, setup documentation for GitHub and Android/iOS wrapping, and source modules for engine, scene/camera, physics/orbit, builders/shaders, NASA API and UI/touch. Produce the requested `ethio-nasa-orbital-defense.zip` containing the standalone project.
-- [x] **Verification:** Production build and Capacitor sync pass; 102 unit tests pass; production Playwright smoke passes across all eight camera states, portrait blocking, landscape handheld sizes, modular ascent/staging, settings/pause isolation, SAS, warp, and orbital prediction. See `VERIFICATION.md` and `shots/`.
+## Original opening and navigation — Mostly implemented
+- Three-second animated MG Studio introduction with original emblem, gold Ezra Kidanu credit and procedural audio hook.
+- Main menu and a procedural orbital-defense satellite in the 3D orbital showroom.
+- Landscape-first, touch-aware widescreen UI. Web delivery does not guarantee device-wide native orientation lock without a native wrapper.
+- Remaining: richer satellite fleet showroom, sound design, options, accessibility and broader UI polish.
 
-## New landscape rebuild specification (complete)
+## VAB craft design — Core prototype implemented
+- Modular catalog of command capsule, propulsion, tanks, fairings, solar power, science payload and other parts; tap or drag/drop; removable modules and stage assignments.
+- Live wet/dry mass, propellant, thrust-to-weight estimate, power balance, science value, cost, budget/readiness checks and stage summaries.
+- Local save/load for designs; browser smoke covers catalog filtering and default-vehicle readiness.
+- Remaining: true 3D node/grid workbench, more part families, robust editor controls, center-of-mass/aero analysis, launch-pad constraints and campaign economics.
 
-- [x] **Landscape lock and adaptive viewport:** Configure the native Capacitor Android activity with `orientation="sensorLandscape"` so portrait play is disabled. Provide a landscape-only play experience and portrait rotation prompt in browser/web contexts. Dynamically resize the Three.js canvas for widescreen 16:9 and 19:9 devices, clamp WebGL device pixel ratio to at most 2.0, and use adaptive letterboxing/pillarboxing without cropping HUD content or allowing page scroll.
-- [x] **Interactive Home showroom:** Provide a Home/Mission Control screen with a live rotating preview of the selected ETRSS-1, ET-SMART-RSS, or ETHIO-DEEP-SPACE 1 model on a dynamic starfield, with smooth touch-drag model rotation. Keep spacecraft choice and mission start available in the showroom.
-- [x] **Settings and control options:** Make a settings panel accessible from Home and pause. Provide touch-sensitivity and joystick-deadzone sliders, independent Pitch/Yaw/Roll inversion switches, Low/Medium/Ultra presets that visibly adjust particle counts, shadow maps and atmospheric GLSL bloom, and Metric/Imperial/Mach telemetry units. Persist user settings and apply them to actual inputs, renderer, particles and telemetry rather than displaying inert controls.
-- [x] **Modular rocket hierarchy and staging:** Implement payload satellite → fairing → upper-stage core → boosters → lower-stage booster components. Expose clear, sequential stage triggers. Jettisoned components must receive outward rigid-body impulses, emit smoke bursts, and be tracked by the camera. Split the two payload-fairing halves and animate their hinges opening before payload deployment.
-- [x] **Keplerian orbital mechanics and prediction:** Maintain real-time semi-major axis, eccentricity and inclination using a patched-conic/orbital approximation. Draw the predictive elliptical orbit in the 3D view and orbital map, including current apoapsis/periapsis markers and updated altitude readouts. Preserve exponential-atmosphere drag, Max-Q hull vibration/warning, fuel-dependent mass and thrust-to-weight changes.
-- [x] **Flight control systems:** Implement smooth vertical 0–100% throttle with incremental tap adjustments; dual-axis touch input for Pitch/Yaw and separate Roll control; active SAS hold modes for Prograde, Retrograde, Normal and Target vectors; and selectable 1×, 5×, 10×, 50× and 1000× orbital time warp with stable bounded integration. Each mode/control must affect simulation state and HUD telemetry.
-- [x] **Landscape glass HUD and cameras:** Build a glassmorphic landscape HUD with Ethiopian flag branding, mission status, UTC clock and telemetry connection state; altitude, velocity, Mach, dynamic pressure, structural load and throttle; and a thumb-accessible bottom bar for launchpad, chase, cinematic and orbital-map cameras, staging, payload deployment and radar scan. Observe device safe areas and keep visible controls/labels from overlapping.
-- [x] **Regression verification and refreshed Android build:** Extend unit and browser smoke checks to validate landscape-only orientation behavior, showroom rotation/model selection, settings persistence and effects, every staging transition including fairing/payload sequencing, Keplerian orbit values and Ap/Pe/path rendering, all four SAS modes, all five time-warp rates, responsive safe-area HUD layout and no collisions. Rebuild the static app, run tests/smoke across wide and ultrawide landscape viewports, sync Capacitor, and compile a refreshed native debug APK.
+## Orbital flight and map — Core prototype implemented
+- Keyboard/touch input, throttle, staging, SAS prograde/retrograde, time warp, orbital map, trajectory trace, apoapsis/periapsis and mission telemetry.
+- RK4 state integration, inverse-square gravity with Earth J2 approximation, exponential atmospheric density, drag, dynamic pressure/Max-Q, approximate heating/ablation, variable propellant flow, orbit elements and stage impulses.
+- Remaining: calibration and broader independent physics tests, more atmospheric/thermal detail, docking/rendezvous, maneuver planning, accurate transfer/encounter simulation and scenario coverage. No flight-critical scientific accuracy is claimed.
+
+## Cockpit, astronaut and EVA — Base interactions implemented
+- Command-module cutaway/interior, crew display, orbit/EVA camera modes, jetpack/translation inputs, animated/generated astronaut asset and capsule re-entry interaction.
+- Original procedural crew fallback keeps the game running if the registered model URL is unavailable.
+- Remaining: deeper cockpit instrumentation, robust EVA contact/orbit constraints, oxygen/resource management and animation/character polish.
+
+## Lunar surface and rover — Base drive loop implemented
+- Six-wheel rover, steering/throttle, generated/rigged rover asset plus original procedural fallback, height-following over a generated field, rock-obstacle response, station waypoint, and rover-to-EVA transitions.
+- Remaining: suspension/traction simulation, richer terrain tiles, collision and mission sampling detail, map/localization, rover interior camera and connected moon-flight progression.
+
+## Missions and defense progression — Early prototype
+- Main menu routes to a powered spacecraft launch and a lunar survey; basic objective and completion feedback exists.
+- Remaining: saveable campaign state, research/unlocks, multiple defense and exploration contracts, funding consequences, target tracking/intercepts, failure/recovery loops and expanded celestial bodies.
+
+## Original assets and scale — Far below the requested 500 MB–1 GB aspiration
+- Five registered GLB models total **6,599,224 bytes (6.29 MiB)**; registered icon and social-preview art total **5,722,999 bytes (5.46 MiB)**; combined registered asset bytes are **12,322,223 bytes (11.75 MiB)**.
+- More world surfaces and spacecraft details are procedural; the project does not contain a 1 GB asset library, a large planet pack or SFS2-scale content. No filler data has been added to inflate install size.
+- Remaining: prioritize useful playable world/part/mission depth, profile performance and expand assets only when they serve actual gameplay.
+
+## Build, validation and authorized delivery — Build/test setup ready; final saves pending
+- Production build with sharing metadata and JS/font budget checks passed; TypeScript and **90 unit tests across 13 files** passed after the major simulation changes.
+- Dedicated Playwright smoke covers VAB, launch, map, cockpit, EVA/re-entry, pause, rover drive, and mobile layout. Re-run after final changes.
+- Remaining: repeat the final build/test/smoke pass, record the exact verified managed-game checkpoint, and commit/push a normal fast-forward update to the user-authorized GitHub `main` branch without force-pushing or discarding its history.

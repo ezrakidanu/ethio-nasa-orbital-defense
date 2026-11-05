@@ -1,5 +1,5 @@
 {
-  "name": "ethioorb",
+  "name": "ethionasa",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,21 +9,14 @@
     "preview": "vite preview --port 4173 --strictPort",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "smoke": "node scripts/smoke.mjs",
-    "cap:sync": "pnpm build && cap sync android",
-    "cap:android": "cap open android",
+    "smoke": "node scripts/ethio-smoke.mjs",
     "manus:build-source": "tsc --noEmit && vite build && node scripts/check-size.mjs"
   },
   "dependencies": {
-    "@capacitor/android": "^8.6.0",
-    "@capacitor/core": "^8.6.0",
-    "@capacitor/ios": "^8.6.0",
-    "@capacitor/screen-orientation": "^8.0.2",
     "@dimforge/rapier3d-compat": "^0.21.0",
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.6.0",
     "@types/three": "^0.186.0",
     "playwright": "^1.63.0",
     "typescript": "^5.9.3",

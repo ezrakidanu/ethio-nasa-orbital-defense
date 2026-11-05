@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "textures": {
-    "assets/models/ethio-deep-space-probe.glb": { "maxSize": 2048, "reason": "Dedicated close-up orbital inspection camera and focal deep-space spacecraft." },
-    "assets/models/etrrs-1-satellite.glb": { "maxSize": 2048, "reason": "Dedicated payload inspection camera and primary Earth-observation satellite." },
-    "assets/models/sls-launch-vehicle.glb": { "maxSize": 2048, "reason": "Tall primary launch vehicle fills the authored tower and aerial launch camera compositions." }
-  }
-}

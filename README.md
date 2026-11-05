@@ -1,91 +1,59 @@
 # ETHIO-NASA: Orbital Defense
 
-A mobile-first, full-screen Three.js/WebGL spaceflight and orbital-defense simulation. Fly an SLS-class launch through staged ascent, deploy an Ethiopian satellite, then navigate a predictive Keplerian orbit and scan NASA-informed hazards. The same project builds as a static web game and a Capacitor Android app.
+An original, browser-playable Three.js spacecraft assembly and flight simulator by MG Studio / Ezra Kidanu. The current build is a playable early vertical slice: assemble a modular launch vehicle, fly a simplified orbital mission, inspect a cockpit cutaway, perform an astronaut EVA, and drive a six-wheel rover across a procedural lunar survey site.
 
-## Features
+This project uses original game art and mechanics. It is not a Spaceflight Simulator 2 reproduction and does not claim similar content volume or fidelity. Orbital and surface behavior is an interactive game approximation, not validated flight software.
 
-- **Landscape-first mobile mission control:** Android uses a sensor-landscape activity lock; browsers display a portrait rotation prompt. The WebGL view adapts to widescreen 16:9–19:9 devices, clamps pixel ratio to 2×, and keeps the HUD inside safe areas without page scrolling.
-- **Interactive 3D showroom:** Select ETRSS-1, ET-SMART-RSS, or ETHIO-DEEP-SPACE 1 and rotate its live preview by dragging.
-- **Configurable controls:** Sensitivity and joystick-deadzone sliders, independent pitch/yaw/roll inversion, Low/Medium/Ultra renderer presets, and Metric/Imperial/Mach telemetry units persist on the device. Flight includes dual-axis pitch/yaw touch input, separate roll buttons, vertical 0–100% throttle with tap increments, SAS holds, and time warp.
-- **Modular staging:** Sequential booster and lower-stage jettison, hinged split fairings, payload-deployment interlock, simulated separation impulses, debris tracking, and smoke effects.
-- **Orbital prediction:** Patched-conic Kepler elements, predicted 3D trajectory, orbit map, live apoapsis/periapsis markers and altitude readouts.
-- **SFS2-style flight and orbital systems:** Exponential atmosphere, aerodynamic drag, altitude-varying gravity, thrust/mass/fuel integration, dynamic pressure/Max-Q alerts and vibration, orbital inertia, solar charging and battery drain.
-- **NASA-informed hazards:** DONKI solar-flare and NeoWs asteroid queries use a 2.5-second timeout, with bundled offline flare and asteroid-vector fallbacks and radar highlighting.
-- **Eight camera states:** Home/showroom (`0`), payload inspection (`1A`), tower launch (`1B`), aerial pad (`1C`), orbital evasion (`2`), telemetry debrief (`3`), cinematic flight (`4`), and orbital map (`5`).
-
-## Requirements and local development
-
-- Node.js 20.19+ (or 22.12+) and pnpm 10+
-- Android Studio/SDK for a local Android build; Xcode/CocoaPods for iOS (macOS only)
+## Run locally
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev              # Vite on http://localhost:5173
+pnpm typecheck
+pnpm test             # unit tests, including orbit and VAB calculations
+pnpm build            # production build, sharing metadata and size budgets
+pnpm smoke            # run after build; opens a headless desktop and touch-browser playthrough
 ```
 
-The game fills the viewport; the document does not scroll. `pnpm build` runs TypeScript diagnostics, restores managed runtime assets, bundles into `dist/`, installs sharing metadata, and checks the JavaScript/font budgets. `pnpm test` runs the unit suite. `pnpm smoke` serves the production build in headless Chromium and checks mission progression, screen states, modal isolation, layout boundaries, safe zones and collisions across desktop and mobile landscape viewports.
+To use the smoke test against a running development server, set `BASE_URL=http://127.0.0.1:3000/`. Browser testing requires Chromium; set `CHROMIUM_PATH=/path/to/chromium` if it is not installed at `/usr/bin/chromium`.
 
-## Controls
+## Current gameplay
 
-- **Touch:** drag the left joystick for pitch/yaw; use adjacent buttons for roll. Adjust the vertical throttle slider or its increment buttons. Tap Stage, Deploy, Radar, or Camera as needed.
-- **Flight modes:** select SAS Off, Prograde, Retrograde, Normal, or Target; select 1×, 5×, 10×, 50×, or 1000× time warp.
-- **Keyboard:** W/S pitch, A/D yaw, Q/E roll, Up/Down throttle, Space ignition, X staging, B payload deployment, R radar scan, C camera state, Escape debrief.
-- **Desktop pointer:** drag the showroom spacecraft and use the on-screen controls.
+- **Vehicle Assembly Building:** browse propulsion, science, power and payload parts; add or remove modules; assign stage numbers; review dry/wet mass, propellant, estimated thrust-to-weight, power, science value, costs and readiness; save/load a design in local storage.
+- **Flight:** control throttle; stage and jettison vehicle modules; use SAS prograde/retrograde assistance; change time warp; inspect altitude, speed, fuel, apoapsis/periapsis, heating, dynamic pressure and Max-Q warnings; switch to map and cockpit views.
+- **Crew:** enter a cockpit/interior cutaway, open the EVA mode, maneuver the astronaut with jetpack input, and return to the capsule. If the streamed model CDN is unavailable, the game provides a visibly simplified procedural astronaut fallback.
+- **Lunar survey:** enter a surface mission, drive and steer the six-wheel rover across a generated terrain field, respond to rock obstacles, and navigate toward a visible science-station marker. EVA exit/re-entry is supported. A procedural rover fallback keeps the mode playable offline.
+- **Mission flow:** the main menu exposes a VAB craft/launch route and a direct lunar survey route. Orbital transfer and mission objectives are implemented as game approximations; this is not yet a full campaign with a large progression tree.
 
-## Flight model and data
+### Controls
 
-`physics/FlightPhysics.js` applies exponential atmospheric density (`ρ₀=1.225 kg/m³`, `H=8500 m`), thrust, aerodynamic drag, altitude-varying gravity, fuel/mass loss and dynamic pressure (`Q=½ρv²`). Crossing the configured 38 kPa structural threshold shakes the camera and raises `WARNING: MAX-Q STRESS LIMIT REACHED`. `physics/OrbitalMechanics.js` models orbital inertia, solar-array charging, battery capacity and storm/shield drain. `physics/KeplerOrbit.js` predicts orbital elements and apsides; `physics/FlightControlSystem.js` implements SAS modes and bounded time warp.
+Use the on-screen controls or a landscape touch display. Keyboard: **WASD** for flight/EVA/rover directional input, **Space** to stage, **Q** for SAS prograde, **R** for SAS retrograde, **M** to open/close map, **C** for cockpit, **V** for EVA, **E** to board a rover from surface EVA, and **Esc** to pause. Flight throttle, time warp, touch joysticks, EVA boost and rover actions are available in the HUD. Landscape-first is a web layout choice; a browser page cannot promise a device-wide native orientation lock.
 
-`api/NASADataPipeline.js` requests NASA DONKI solar flares and NeoWs asteroid data with a 2.5-second timeout and CORS/network handling. NASA's public `DEMO_KEY` is used by default; replace it locally for higher quota. Browser-embedded keys are public, so use a server proxy if a production key must be protected. Offline flare and NEO data is bundled for play without network access.
+## Simulation notes
 
-## Project map
+The code includes fourth-order Runge–Kutta state integration, an inverse-square gravity model with a J2 perturbation, an exponential atmospheric approximation, drag, dynamic pressure and Max-Q alerts, approximate heating/ablation, variable propellant mass flow, orbital-element/trajectory calculations, stage impulses and attitude-assist controls. These are deliberately bounded real-time gameplay approximations; no scientific validation or mission-critical precision is claimed.
 
-```text
-index.html                       Full-screen WebGL canvas and HUD mount
-css/style.css                    Fixed landscape viewport and responsive glass HUD
-js/main.js                       Runtime orchestration, input actions and smoke-test hook
-engine/EngineCore.js              WebGL renderer, animation loop and graphics presets
-engine/SceneManager.js            Launch complex and deep-space environment
-engine/CameraController.js        Eight camera states and Max-Q camera shake
-physics/FlightPhysics.js          Atmospheric ascent, thrust, drag, gravity, fuel and Q
-physics/OrbitalMechanics.js       Orbital inertia, solar charge, battery and shields
-physics/KeplerOrbit.js             Elements, apsides and orbital prediction
-physics/FlightControlSystem.js    SAS modes and time-warp integration
-builders/AssetBuilder.js          Rocket assembly, stages, showroom, hazards and effects
-builders/ShaderBuilder.js          Rayleigh/Mie atmosphere, flag and decal textures
-api/NASADataPipeline.js            NASA DONKI/NeoWs feeds and offline fallbacks
-ui/UIManager.js                    Mission, HUD, isolated Settings/Pause modals and debrief
-ui/GameSettings.js                 Persisted input, graphics and units settings
-ui/TouchControls.js                Joystick, throttle, roll and keyboard controls
-assets/models/                    SLS, ETRSS-1 and deep-space probe GLBs
-capacitor.config.ts                Capacitor identity and webDir=dist
-android/                           Capacitor Android wrapper and landscape manifest
-scripts/smoke.mjs                  Production Playwright and layout-collision checks
-```
+The VAB uses a compact, touch-friendly part catalog and modular snap relationships rather than a fully featured CAD application. Mission coverage is currently an orbital flight and a lunar surface survey; additional launch sites, celestial bodies, a deeper defense campaign, advanced part families, detailed resource systems, and broader camera/interior features remain future work.
 
-Procedural Three.js assets complement the three local spacecraft GLBs. No runtime model/texture CDN is required by the standalone archive.
+## Project structure
 
-## Capacitor Android
+| Path | Responsibility |
+| --- | --- |
+| `src/ethio/physics/orbit.ts` | Orbit propagation, gravity, atmosphere, state integration and orbital elements |
+| `src/ethio/vab/parts.ts` | Modular part catalog, build plan, constraints and vehicle statistics |
+| `src/ethio/flight-sim.ts` | Three.js celestial scene, mission state, spacecraft, cockpit, EVA, rover and telemetry |
+| `src/ethio/ui.ts` / `flight.css` | Assembly, flight, surface, menu and touch UI |
+| `src/ethio/app.ts` | Startup, input routing, mission transitions, local design save/load and audio hooks |
+| `src/game/config.ts` / `tuning.ts` | Shared gameplay parameter owner and development Preview Tweak bridge |
+| `assets.lock.json` | Managed asset locations, hashes and purpose groups |
+| `scripts/ethio-smoke.mjs` | Desktop and touch mission-flow smoke test |
 
-The application ID is `com.ethionasa.orbitaldefense`; web assets are built into `dist/`. The Android manifest requests sensor landscape, while the web bootstrap locks orientation where supported and shows a portrait fallback prompt.
+## Assets, performance and limitations
 
-```bash
-pnpm install
-pnpm cap:sync
-cd android
-./gradlew assembleDebug
-```
+Generated astronaut, command-capsule and six-wheel rover models are registered through the project's managed Three.js asset workflow, with an animated/rigged astronaut variant. New orbital satellite, cockpit, world and unavailable-model fallbacks are constructed from original Three.js geometry. Models load asynchronously; if a Storage URL is not available, a simplified procedural fallback is shown rather than blocking the entire game. The social preview artwork and icon are project-specific originals.
 
-The debug APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. This repository also includes the **Build Android debug APK** GitHub Actions workflow (`.github/workflows/build-android-apk.yml`), which builds on Ubuntu x86-64 and uploads an artifact named `ethio-nasa-orbital-defense-debug-apk`. It is useful when a local host cannot run Android's x86-only AAPT2 binary. For Android Studio, run `pnpm exec cap open android` after syncing.
+The requested 500 MB–1 GB installation footprint is an aspiration, not a target reached by this early build. The current project contains only a small registered asset set and a compact web bundle; it does not contain a 1 GB world, campaign or asset library. Large-volume files would increase network and storage costs and should only be added when they deliver useful playable content.
 
-On macOS with Xcode/CocoaPods, add and sync iOS with `pnpm exec cap add ios` and `pnpm exec cap sync ios`.
+## Credits and licensing
 
-## GitHub and standalone package
-
-Public repository: [github.com/ezrakidanu/ethio-nasa-orbital-defense](https://github.com/ezrakidanu/ethio-nasa-orbital-defense).
-
-The standalone `ethio-nasa-orbital-defense.zip` contains the full source, lockfile, three GLB spacecraft models, project-sharing artwork, production web output, synced Android wrapper, compiled debug APK, tests, build scripts, and smoke evidence. Registered model and artwork files are present in the archive and tracked in the public repository for an independently reproducible build.
-
-## Verification
-
-See [`VERIFICATION.md`](VERIFICATION.md) for dated build, test, smoke, Capacitor sync, APK, and archive results. Browser captures are in `shots/`.
+This project uses Three.js (MIT), Rapier (Apache-2.0, retained in the initialized starter dependency set), and the bundled ManusCC0 font family under the included CC0 license. Game-specific code and assets are original or generated for this project. No third-party Spaceflight Simulator 2 models, textures, code or branding are included.

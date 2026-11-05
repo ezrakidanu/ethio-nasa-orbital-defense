@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">ETHIO-NASA</string>
-    <string name="title_activity_main">ETHIO-NASA</string>
-    <string name="package_name">com.ethionasa.orbitaldefense</string>
-    <string name="custom_url_scheme">com.ethionasa.orbitaldefense</string>
-</resources>

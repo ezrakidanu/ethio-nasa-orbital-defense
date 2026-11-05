@@ -3,9 +3,11 @@ dist/
 shots/
 /.manus-webdev/preview-identity.json
 # Assets restored from assets.lock.json
-/assets/models/ethio-deep-space-probe.glb
-/assets/models/etrrs-1-satellite.glb
-/assets/models/sls-launch-vehicle.glb
-/assets/share/favicon.png
+/assets/models/ethio-astronaut-animated.glb
+/assets/models/ethio-astronaut-rigged.glb
+/assets/models/ethio-astronaut.glb
+/assets/models/ethio-command-capsule.glb
+/assets/models/ethio-sixwheel-rover.glb
 # Assets restored from assets.lock.json
+/assets/share/favicon.png
 /assets/share/og.png
