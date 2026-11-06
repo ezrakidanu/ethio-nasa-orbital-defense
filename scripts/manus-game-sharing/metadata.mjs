@@ -264,12 +264,15 @@ function shareTags(snapshot, fields) {
   const meta = (key, value) => !includes(key) ? '' : `<meta ${key.startsWith('og:') ? 'property' : 'name'}="${key}" content="${escape(value)}">`
   const tags = [fields ? '' : BEGIN]
   const { favicon, og } = snapshot.assets
+  const basePath = process.env.GITHUB_PAGES_BASE_PATH ?? ''
+  if (basePath && (!/^\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*$/.test(basePath) || basePath.split('/').some(part => part === '.' || part === '..'))) fail('GitHub Pages base path is invalid')
+  const publicBase = snapshot.publicationOrigin + basePath
   if (includes('title')) tags.push(`<title>${escape(snapshot.title)}</title>`)
   if (favicon && includes('favicon')) tags.push(`<link rel="icon" type="image/png" href="./${favicon.path}">`, `<link rel="apple-touch-icon" href="./${favicon.path}">`)
-  tags.push(meta('description', snapshot.description), meta('og:type', 'website'), meta('og:title', snapshot.title), meta('og:description', snapshot.description), meta('og:url', snapshot.publicationOrigin + '/'))
-  if (og) tags.push(meta('og:image', `${snapshot.publicationOrigin}/${og.path}`), meta('og:image:width', og.width), meta('og:image:height', og.height), meta('og:image:type', og.mime), meta('og:image:alt', snapshot.title))
+  tags.push(meta('description', snapshot.description), meta('og:type', 'website'), meta('og:title', snapshot.title), meta('og:description', snapshot.description), meta('og:url', publicBase + '/'))
+  if (og) tags.push(meta('og:image', `${publicBase}/${og.path}`), meta('og:image:width', og.width), meta('og:image:height', og.height), meta('og:image:type', og.mime), meta('og:image:alt', snapshot.title))
   tags.push(meta('twitter:card', og ? 'summary_large_image' : 'summary'), meta('twitter:title', snapshot.title), meta('twitter:description', snapshot.description))
-  if (og) tags.push(meta('twitter:image', `${snapshot.publicationOrigin}/${og.path}`), meta('twitter:image:alt', snapshot.title))
+  if (og) tags.push(meta('twitter:image', `${publicBase}/${og.path}`), meta('twitter:image:alt', snapshot.title))
   if (!fields) tags.push(END)
   return tags.filter(Boolean).join('\n') + '\n'
 }

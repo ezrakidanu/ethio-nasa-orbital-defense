@@ -4,7 +4,7 @@ import { basename } from 'node:path'
 import { assembleThreejsShareSite, GameSharingValidationError } from './metadata.mjs'
 
 // Publication metadata is public project content; no runtime credentials are embedded here.
-const publicationOrigin = "https://ethionasa-3c347pgm.manus.game"
+const publicationOrigin = "https://ezrakidanu.github.io"
 const outputDirectory = "dist"
 const projectTitle = "ETHIO-NASA: Orbital Defense"
 // Run the original script through the invoking package manager, preserving argument quoting.

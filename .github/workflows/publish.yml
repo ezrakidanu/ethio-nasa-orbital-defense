@@ -1,0 +1,113 @@
+name: Publish ETHIO-NASA and build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish_apk_release:
+        description: Create a public GitHub Release with the built APK attached
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ethio-nasa-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  web:
+    name: Build and deploy web game
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check and build
+        run: pnpm typecheck && pnpm test && pnpm build
+        env:
+          SKIP_MANUS_ASSET_RESTORE: '1'
+          GITHUB_PAGES_BASE_PATH: /ethio-nasa-orbital-defense
+      - name: Verify static output
+        run: test -s dist/index.html && grep -q 'ETHIO-NASA' dist/index.html && grep -q 'https://ezrakidanu.github.io/ethio-nasa-orbital-defense/share/' dist/index.html && find dist/share -type f -name '*.png' | grep -q .
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  android:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build web assets and sync Capacitor
+        run: pnpm build && pnpm cap:sync
+        env:
+          SKIP_MANUS_ASSET_RESTORE: '1'
+      - name: Assemble debug APK
+        run: cd android && ./gradlew --no-daemon assembleDebug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethio-nasa-orbital-defense-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish APK as a GitHub Release asset
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_apk_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_PATH: android/app/build/outputs/apk/debug/app-debug.apk
+          RELEASE_TAG: android-build-${{ github.run_number }}
+        run: |
+          gh release create "$RELEASE_TAG" "$APK_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ETHIO-NASA Android APK — build $GITHUB_RUN_NUMBER" \
+            --notes "Debug APK built from commit $GITHUB_SHA by GitHub Actions. Install only on Android devices where installing APK files from outside Google Play is allowed."

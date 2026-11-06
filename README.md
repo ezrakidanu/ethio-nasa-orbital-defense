@@ -17,6 +17,12 @@ pnpm smoke            # run after build; opens a headless desktop and touch-brow
 
 To use the smoke test against a running development server, set `BASE_URL=http://127.0.0.1:3000/`. Browser testing requires Chromium; set `CHROMIUM_PATH=/path/to/chromium` if it is not installed at `/usr/bin/chromium`.
 
+## GitHub web build and Android APK
+
+On pushes to `main`, GitHub Actions checks TypeScript and unit tests, builds and deploys the browser game to [GitHub Pages](https://ezrakidanu.github.io/ethio-nasa-orbital-defense/), and builds an Android **debug APK**. The APK is attached to the Actions run as `ethio-nasa-orbital-defense-debug-apk` for 30 days. A manually dispatched run can additionally publish a tagged GitHub Release with the APK as a public downloadable asset. It is a debug-signed build, not a Play Store release package, and may require Android's permission to install apps from unknown sources.
+
+The hosted build skips private Manus Storage downloads; models load from their registered CDN URLs when available, while procedural fallbacks keep the game playable when they are not. No Manus credentials are needed in GitHub Actions.
+
 ## Current gameplay
 
 - **Vehicle Assembly Building:** browse propulsion, science, power and payload parts; add or remove modules; assign stage numbers; review dry/wet mass, propellant, estimated thrust-to-weight, power, science value, costs and readiness; save/load a design in local storage.

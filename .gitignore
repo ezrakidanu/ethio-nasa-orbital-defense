@@ -11,3 +11,10 @@ shots/
 # Assets restored from assets.lock.json
 /assets/share/favicon.png
 /assets/share/og.png
+/android/.gradle/
+/android/local.properties
+/android/build/
+/android/app/build/
+/android/.idea/
+/android/capacitor-cordova-android-plugins/
+/android/app/src/main/assets/

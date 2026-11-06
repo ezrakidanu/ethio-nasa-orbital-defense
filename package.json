@@ -10,13 +10,18 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "smoke": "node scripts/ethio-smoke.mjs",
-    "manus:build-source": "tsc --noEmit && vite build && node scripts/check-size.mjs"
+    "manus:build-source": "tsc --noEmit && vite build && node scripts/check-size.mjs",
+    "cap:sync": "cap sync android",
+    "apk:debug": "pnpm build && pnpm cap:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/core": "^8.6.0",
     "@dimforge/rapier3d-compat": "^0.21.0",
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
     "@types/three": "^0.186.0",
     "playwright": "^1.63.0",
     "typescript": "^5.9.3",
