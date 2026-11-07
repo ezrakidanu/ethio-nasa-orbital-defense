@@ -8,3 +8,46 @@
 /* Mission feedback and touch-safe flight controls for short landscape phone screens. */
 .mission-guide{margin:0 0 10px;padding:11px;border:1px solid rgba(227,189,103,.34);background:linear-gradient(135deg,rgba(48,39,22,.42),rgba(12,20,31,.96))}.mission-guide .eyebrow{font-size:7px;line-height:1.5;color:var(--gold);margin:0 0 5px;letter-spacing:.1em}.mission-guide h3{font:600 16px var(--display);margin:0 0 6px}.mission-guide p{font-size:10px;line-height:1.45;color:#b5c2ce;margin:0 0 8px}.mission-guide p b{color:#f0d284}.mission-progress{height:4px;background:#263649;overflow:hidden}.mission-progress i{display:block;width:0;height:100%;background:var(--gold);transition:width .2s linear}.mission-state{font:8px var(--mono);color:var(--mint);margin:7px 0}.deploy-button{width:100%;min-height:36px;background:#d8b55f;border:0;color:#151a21;padding:7px;font:700 10px var(--mono);letter-spacing:.07em;cursor:pointer}.deploy-button:disabled{background:#273341;color:#91a0af;cursor:not-allowed}
 @media(max-height:600px){.flight-side{height:calc(100dvh - 126px);max-height:calc(100dvh - 126px);min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#566a80 #0b1320}.mission-guide{position:sticky;top:0;z-index:4;background:#0c141f;isolation:isolate;box-shadow:0 4px 10px rgba(0,0,0,.35)}.flight-footer{padding-bottom:2px}.flight-screen{overflow:hidden}}
+
+
+/* Phone-landscape layout: keep the title actions visible and touch-sized. */
+@media (max-width: 1000px) and (max-height: 600px) {
+  .app-shell { padding-inline: max(16px, 3.4vw); }
+  .topbar { height: 48px; flex-basis: 48px; }
+  .brand { gap: 8px; font-size: 20px; }
+  .brand-glyph { width: 26px; height: 26px; font-size: 18px; }
+  .top-status { font-size: 8px; letter-spacing: .08em; }
+  .icon-button { width: 44px; height: 40px; margin-left: 10px; }
+  .hero {
+    height: auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(200px, .9fr);
+    align-content: center;
+    gap: 10px;
+    padding: 10px 0 8px;
+  }
+  .hero-copy { width: auto; max-width: none; min-width: 0; }
+  .eyebrow { margin-bottom: 7px; font-size: 8px; letter-spacing: .12em; }
+  .hero h1 { font-size: clamp(34px, 6vw, 50px); line-height: .86; }
+  .lead { margin: 9px 0; font-size: 10px; line-height: 1.4; }
+  .hero-actions { display: grid; grid-template-columns: 1fr; align-items: stretch; gap: 5px; }
+  .hero-actions > .primary { width: 100%; min-height: 48px; }
+  .hero-actions .primary span { margin-left: 12px; }
+  .secondary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .secondary-actions .text-button { min-height: 40px; padding: 4px 5px; border: 1px solid var(--line); font-size: 9px; }
+  .hero-panel { width: 100%; height: clamp(145px, 42vh, 205px); min-height: 0; padding: 10px 12px; }
+  .panel-top { font-size: 9px; }
+  .orbit-graphic { inset: 15% 2% 20%; }
+  .telemetry-mini { right: 10px; bottom: 8px; left: 10px; padding-top: 7px; }
+  .hero-stats, .feature-strip { display: none; }
+  .hero-caption { position: static; grid-column: 1 / -1; margin: 0; font-size: 7px; }
+  .screen:has(.hero) { overflow-x: hidden; overflow-y: auto; }
+  .app-shell footer { height: 22px; flex-basis: 22px; align-items: center; font-size: 7px; letter-spacing: .06em; }
+}
+
+@media (max-width: 640px) and (max-height: 600px) {
+  .hero { grid-template-columns: minmax(0, 1fr) minmax(175px, .85fr); gap: 8px; }
+  .hero h1 { font-size: clamp(32px, 6vw, 42px); }
+  .lead { font-size: 9px; }
+}

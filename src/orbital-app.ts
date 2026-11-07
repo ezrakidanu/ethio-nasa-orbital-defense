@@ -14,22 +14,42 @@ type Activity = 'orbit' | 'eva' | 'rover'
 const $ = <T extends HTMLElement>(selector: string, root: ParentNode = document) => root.querySelector<T>(selector)!
 const fmt = (n: number, digits = 0) => Number.isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—'
 const clamp = (v:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,v))
+const makeStarterBuild = () => createBuild([
+  {id:'payload',kind:'satellite-payload',mountMode:'side',positionM:5,stage:2,fuelFraction:1},
+  {id:'sensor',kind:'optical-sensor',mountMode:'side',positionM:4.2,stage:2},
+  {id:'fairing',kind:'fairing',mountMode:'shell',positionM:3.8,stage:2},
+  {id:'capsule',kind:'capsule',positionM:3,stage:2},
+  {id:'upper-engine',kind:'engine',positionM:2,stage:2},
+  {id:'upper-tank',kind:'tank',positionM:1.3,stage:2,fuelFraction:.45},
+  {id:'booster-engine',kind:'engine',positionM:.5,stage:1},
+  {id:'booster-tank',kind:'tank',positionM:0,stage:1,fuelFraction:.85},
+  {id:'solar',kind:'solar-array',mountMode:'side',positionM:4.5,stage:2},
+])
 class OrbitalScene {
   readonly scene = new THREE.Scene()
   readonly camera = new THREE.PerspectiveCamera(50, 1, 0.001, 300)
   readonly renderer: Renderer
   readonly earth = new THREE.Group()
   readonly vehicle = new THREE.Group()
+  readonly rover = new THREE.Group()
   private stars?: THREE.Points
   private orbit?: THREE.Line
   private rocket?: THREE.Object3D
   private astronaut?: THREE.Object3D
+  private landingLegs?: THREE.Group
+  private landingLegsEnabled=false
+  private evaOffset = new THREE.Vector2()
+  private roverWheels: THREE.Mesh[] = []
+  private roverSpeed = 0
+  private roverSteering = 0
+  private roverHeading = 0
+  private sasMode: 'OFF' | 'PROGRADE' | 'RETROGRADE' = 'OFF'
   private activity: Activity = 'orbit'
   private cockpit = false
-  private roverDistance = 0
   private cameraAzimuth = 0.82
   private cameraElevation = 1.15
   private attitude = { x: 0, y: 0 }
+  private flightHeading = 0
 
   constructor(canvas:HTMLCanvasElement, quality:'low'|'medium'|'high') {
     this.renderer=new Renderer(canvas,quality)
@@ -38,8 +58,8 @@ class OrbitalScene {
     this.camera.position.set(2.8,1.3,2.8)
     const amb=new THREE.HemisphereLight(0xbad8ff,0x080b16,1.5); this.scene.add(amb)
     const sun=new THREE.DirectionalLight(0xffedc5,3.2); sun.position.set(-5,4,6); this.scene.add(sun)
-    this.makeEarth(); this.makeStars(); this.makeStation(); this.makeVehicle()
-    this.scene.add(this.earth,this.vehicle)
+    this.makeEarth(); this.makeStars(); this.makeStation(); this.makeVehicle(); this.makeRover()
+    this.scene.add(this.earth,this.vehicle,this.rover)
     this.scene.add(new THREE.AmbientLight(0xffffff,0.45))
     window.addEventListener('resize',()=>this.renderer.resize())
     canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId)})
@@ -72,16 +92,49 @@ class OrbitalScene {
     this.rocket=fallback
     try{const gltf=await new GLTFLoader().loadAsync(rocketAsset);this.rocket=gltf.scene; this.fitModel(this.rocket,.42)}catch(e){console.warn('Rocket model unavailable; using local procedural craft.',e)}
     this.vehicle.add(this.rocket); this.rocket.position.set(1.04,.03,0)
+    const legs=new THREE.Group();const legMat=new THREE.MeshStandardMaterial({color:'#c2b58f',metalness:.55,roughness:.45})
+    for(const x of [-1,1])for(const z of [-1,1]){const strut=new THREE.Mesh(new THREE.CylinderGeometry(.004,.006,.14,6),legMat);strut.position.set(x*.055,-.1,z*.045);strut.rotation.z=x*.42;legs.add(strut);const foot=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.012,8),legMat);foot.position.set(x*.09,-.17,z*.055);legs.add(foot)}
+    legs.visible=this.landingLegsEnabled;this.rocket.add(legs);this.landingLegs=legs
     const people = await new GLTFLoader().loadAsync(astronautAsset).catch(()=>null)
-    if(people){this.astronaut=people.scene;this.fitModel(this.astronaut,.16);this.astronaut.position.set(1.1,.04,.12);this.astronaut.visible=false;this.vehicle.add(this.astronaut)}
+    if(people){this.astronaut=people.scene;this.fitModel(this.astronaut,.16);this.astronaut.position.set(1.1+this.evaOffset.x,.04+this.evaOffset.y,.12);this.astronaut.visible=false;this.vehicle.add(this.astronaut)}
+  }
+  private makeRover(){
+    const bodyMat=new THREE.MeshStandardMaterial({color:'#d9d4c5',metalness:.42,roughness:.55})
+    const darkMat=new THREE.MeshStandardMaterial({color:'#273546',metalness:.25,roughness:.68})
+    const panelMat=new THREE.MeshStandardMaterial({color:'#275583',metalness:.5,roughness:.35,emissive:'#102746'})
+    const deck=new THREE.Mesh(new THREE.BoxGeometry(.25,.055,.17),bodyMat);deck.position.y=.105;this.rover.add(deck)
+    const equipment=new THREE.Mesh(new THREE.BoxGeometry(.11,.065,.105),darkMat);equipment.position.set(-.015,.16,0);this.rover.add(equipment)
+    const mast=new THREE.Mesh(new THREE.CylinderGeometry(.008,.01,.14,8),bodyMat);mast.position.set(.085,.21,0);this.rover.add(mast)
+    const camera=new THREE.Mesh(new THREE.BoxGeometry(.06,.035,.05),panelMat);camera.position.set(.085,.28,0);this.rover.add(camera)
+    const panel=new THREE.Mesh(new THREE.BoxGeometry(.14,.008,.09),panelMat);panel.position.set(-.07,.15,.105);this.rover.add(panel)
+    for(const x of [-.08,0,.08])for(const z of [-.105,.105]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.034,.034,.024,12),darkMat);wheel.rotation.x=Math.PI/2;wheel.position.set(x,.045,z);this.rover.add(wheel);this.roverWheels.push(wheel)}
+    this.rover.visible=false
+  }
+  private updateRover(dt:number){
+    if(!this.rover.visible)return
+    this.roverHeading+=this.roverSteering*dt*1.1
+    const normal=this.rover.position.clone().normalize()
+    const up=new THREE.Vector3(0,1,0)
+    let east=new THREE.Vector3().crossVectors(up,normal)
+    if(east.lengthSq()<1e-6)east.set(0,0,1);else east.normalize()
+    const north=new THREE.Vector3().crossVectors(normal,east).normalize()
+    const direction=east.multiplyScalar(Math.sin(this.roverHeading)).addScaledVector(north,Math.cos(this.roverHeading))
+    normal.addScaledVector(direction,this.roverSpeed*dt*.018).normalize()
+    this.rover.position.copy(normal.multiplyScalar(1.008))
+    this.rover.quaternion.setFromUnitVectors(up,normal)
+    for(const wheel of this.roverWheels)wheel.rotation.z-=this.roverSpeed*dt*5
   }
   private fitModel(model:THREE.Object3D,height:number){const box=new THREE.Box3().setFromObject(model);const size=box.getSize(new THREE.Vector3());const center=box.getCenter(new THREE.Vector3());const s=height/Math.max(size.x,size.y,size.z);model.scale.setScalar(s);model.position.sub(center.multiplyScalar(s));model.rotation.x=Math.PI/2}
-  setActivity(a:Activity){this.activity=a;if(this.astronaut)this.astronaut.visible=a==='eva';this.vehicle.visible=a!=='rover';if(a==='rover')this.vehicle.visible=true}
+  setActivity(a:Activity){const enteringRover=a==='rover'&&this.activity!=='rover';this.activity=a;if(this.astronaut)this.astronaut.visible=a==='eva';this.vehicle.visible=a!=='rover';this.rover.visible=a==='rover';if(enteringRover){const normal=this.vehicle.position.clone().normalize();if(normal.lengthSq()<.5)normal.set(1,0,0);this.rover.position.copy(normal.multiplyScalar(1.008));this.rover.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),normal)}}
+  setLandingLegs(value:boolean){this.landingLegsEnabled=value;if(this.landingLegs)this.landingLegs.visible=value}
+  setSas(mode:'OFF'|'PROGRADE'|'RETROGRADE'){this.sasMode=mode;this.attitude={x:0,y:0}}
+  setEvaOffset(x:number,y:number){this.evaOffset.set(x,y);if(this.astronaut)this.astronaut.position.set(1.1+x,.04+y,.12)}
+  setRoverControls(speed:number,steering:number){this.roverSpeed=speed;this.roverSteering=steering}
   setCockpit(value:boolean){this.cockpit=value}
-  setAttitude(x:number,y:number){this.attitude.x=x;this.attitude.y=y}
+  setAttitude(x:number,y:number){if(this.sasMode==='OFF'){this.attitude.x=x;this.attitude.y=y}}
   setOrbit(points:Vec3[]){if(this.orbit){this.scene.remove(this.orbit);this.orbit.geometry.dispose();(this.orbit.material as THREE.Material).dispose();this.orbit=undefined}if(points.length<2)return;const geometry=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(p.x/EARTH.meanRadius,p.y/EARTH.meanRadius,p.z/EARTH.meanRadius)));this.orbit=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:'#ffd271',transparent:true,opacity:.75}));this.scene.add(this.orbit)}
-  setState(s:OrbitalState){const p=new THREE.Vector3(s.position.x/EARTH.meanRadius,s.position.y/EARTH.meanRadius,s.position.z/EARTH.meanRadius);this.vehicle.position.copy(p);if(this.rocket){this.rocket.position.set(0,0,0);this.rocket.rotation.z=Math.atan2(s.velocity.y,s.velocity.x)-Math.PI/2+this.attitude.x*.3;this.rocket.rotation.x=this.attitude.y*.3}if(this.cockpit&&this.activity==='orbit'){this.camera.position.copy(p).add(new THREE.Vector3(.08,.08,.14));this.camera.lookAt(p.clone().add(new THREE.Vector3(0,.02,-.1)))} }
-  render(dt:number){if(this.activity==='rover')this.roverDistance+=dt*3;this.earth.rotation.y+=dt*.018;if(this.stars)this.stars.rotation.y+=dt*.0003;if(!this.cockpit){const target=this.vehicle.position.clone();const radius=3.35;const desired=new THREE.Vector3(Math.sin(this.cameraAzimuth)*radius,this.cameraElevation,Math.cos(this.cameraAzimuth)*radius);this.camera.position.lerp(desired,Math.min(1,dt*.45));this.camera.lookAt(target)}this.renderer.render(this.scene,this.camera)}
+  setState(s:OrbitalState){const p=new THREE.Vector3(s.position.x/EARTH.meanRadius,s.position.y/EARTH.meanRadius,s.position.z/EARTH.meanRadius);this.vehicle.position.copy(p);if(this.rocket){this.rocket.position.set(0,0,0);const prograde=Math.atan2(s.velocity.y,s.velocity.x)-Math.PI/2;const heading=this.sasMode==='PROGRADE'?prograde:this.sasMode==='RETROGRADE'?prograde+Math.PI:this.flightHeading;this.rocket.rotation.z=heading+(this.sasMode==='OFF'?this.attitude.x*.3:0);this.rocket.rotation.x=this.attitude.y*.3}if(this.cockpit&&this.activity==='orbit'){this.camera.position.copy(p).add(new THREE.Vector3(.08,.08,.14));this.camera.lookAt(p.clone().add(new THREE.Vector3(0,.02,-.1)))} }
+  render(dt:number){this.updateRover(dt);this.earth.rotation.y+=dt*.018;if(this.stars)this.stars.rotation.y+=dt*.0003;if(!this.cockpit){const target=(this.activity==='rover'?this.rover.position:this.vehicle.position).clone();const radius=3.35;const desired=target.clone().add(new THREE.Vector3(Math.sin(this.cameraAzimuth)*radius,this.cameraElevation,Math.cos(this.cameraAzimuth)*radius));this.camera.position.lerp(desired,Math.min(1,dt*.45));this.camera.lookAt(target)}this.renderer.render(this.scene,this.camera)}
 }
 
 export class OrbitalApp {
@@ -89,23 +142,15 @@ export class OrbitalApp {
   private audio=new Audio(); private scene:OrbitalScene
   private screen:Mode='menu'; private activity:Activity='orbit'; private build:VehicleBuild; private budget=5_500_000
   private state:OrbitalState={position:{x:EARTH.meanRadius+400_000,y:0,z:0},velocity:{x:0,y:7_670,z:300},mass:46_000,time:0}
-  private worker:Worker; private throttle=0; private timeScale=1; private running=false; private sas='OFF'; private stageIndex=0; private fairing=true; private landingLegs=false; private missionName='Ethiopian Earth Observation'; private maxQ=0; private drag=0; private heat=0; private evaPos={x:0,y:0,z:0}; private roverSpeed=0; private cockpit=false
+  private worker:Worker; private throttle=0; private timeScale=1; private running=false; private sas='OFF'; private stageIndex=0; private fairing=true; private landingLegs=false; private missionName='Ethiopian Earth Observation'; private maxQ=0; private drag=0; private heat=0; private evaPos={x:0,y:0,z:0}; private roverSpeed=0; private roverSteering=0; private cockpit=false
 
+  private muted=false
+  private flightSideScroll=0
   private payloadDeployed=false
 
   constructor(){
     this.scene=new OrbitalScene(this.canvas,'medium')
-    this.build=createBuild([
-      {id:'payload',kind:'satellite-payload',mountMode:'side',positionM:5,stage:2,fuelFraction:1},
-      {id:'sensor',kind:'optical-sensor',mountMode:'side',positionM:4.2,stage:2},
-      {id:'fairing',kind:'fairing',mountMode:'shell',positionM:3.8,stage:2},
-      {id:'capsule',kind:'capsule',positionM:3,stage:2},
-      {id:'upper-engine',kind:'engine',positionM:2,stage:2},
-      {id:'upper-tank',kind:'tank',positionM:1.3,stage:2,fuelFraction:.45},
-      {id:'booster-engine',kind:'engine',positionM:.5,stage:1},
-      {id:'booster-tank',kind:'tank',positionM:0,stage:1,fuelFraction:.85},
-      {id:'solar',kind:'solar-array',mountMode:'side',positionM:4.5,stage:2},
-    ])
+    this.build=makeStarterBuild()
     this.worker=new Worker(new URL('./physics/worker.ts',import.meta.url),{type:'module'})
     this.worker.onmessage=(ev:MessageEvent<PhysicsResponse>)=>{const msg=ev.data;if(msg.type==='state'||msg.type==='ready'){this.state=msg.state;this.scene.setState(this.state);this.updateFlight()}}
     this.worker.postMessage({type:'init',state:this.state,stepsPerTick:1} satisfies PhysicsCommand)
@@ -113,14 +158,15 @@ export class OrbitalApp {
     const start=performance.now();const tick=(now:number)=>{this.scene.render(Math.min(.05,(now-(this.lastFrame??now))/1000));this.lastFrame=now;if(this.screen==='menu'&&now-start>=2500&&this.splashVisible){this.splashVisible=false;$('#boot')?.classList.add('fade-out')}requestAnimationFrame(tick)};requestAnimationFrame(tick)
   }
   private lastFrame?:number;private splashVisible=true
-  private makeShell(){this.host.innerHTML=`<div id="boot" class="boot"><div class="brand-mark"><span class="mark-orbit"></span><span class="mark-star">✦</span></div><div class="boot-brand">MG STUDIO</div><div class="boot-credit">DEVELOPED BY MG STUDIO / EZRA KIDANU</div><div class="boot-sub">FLIGHT SYSTEMS INITIALIZING</div><div class="boot-progress"><i></i></div></div><div class="app-shell"><header class="topbar"><a class="brand" data-action="home"><span class="brand-glyph">◈</span><span>ETHIO<span class="gold">—</span>NASA</span></a><span class="top-status"><i></i> OFFLINE MISSION SYSTEMS</span><button class="icon-button" data-action="sound" aria-label="Toggle sound">♫</button></header><main id="screen" class="screen"></main><footer><span>MG STUDIO · EZRA KIDANU</span><span>NASA SPACE APPS CHALLENGE · 2026</span></footer></div>`
-    this.host.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-action]');if(b)this.act(b.dataset.action!,b)});this.host.addEventListener('input',e=>this.onInput(e));this.host.addEventListener('change',e=>this.onInput(e));this.host.addEventListener('pointerdown',e=>{const t=(e.target as HTMLElement).closest<HTMLElement>('[data-stick]');if(t){t.setPointerCapture(e.pointerId);this.controlStick(e)}});this.host.addEventListener('pointermove',e=>{if((e.target as HTMLElement).hasPointerCapture(e.pointerId))this.controlStick(e)});this.host.addEventListener('pointerup',e=>{const t=e.target as HTMLElement;if(t.hasPointerCapture(e.pointerId))t.releasePointerCapture(e.pointerId)})
+  private makeShell(){this.host.innerHTML=`<div id="boot" class="boot"><div class="brand-mark"><span class="mark-orbit"></span><span class="mark-star">✦</span></div><div class="boot-brand">ETHIO-NASA</div><div class="boot-credit">NASA SPACE APPS CHALLENGE</div><div class="boot-sub">FLIGHT SYSTEMS INITIALIZING</div><div class="boot-progress"><i></i></div></div><div class="app-shell"><header class="topbar"><a class="brand" data-action="home"><span class="brand-glyph">◈</span><span>ETHIO<span class="gold">—</span>NASA</span></a><span class="top-status"><i></i> OFFLINE MISSION SYSTEMS</span><button class="icon-button" data-action="sound" aria-label="Toggle sound">♫</button></header><main id="screen" class="screen"></main><footer><span>ETHIO-NASA · FLIGHT OPERATIONS</span><span>NASA SPACE APPS CHALLENGE · 2026</span></footer></div>`
+    this.host.addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-action]');if(b){const side=b.closest<HTMLElement>('.flight-side');if(side)this.flightSideScroll=side.scrollTop;this.act(b.dataset.action!,b)}});this.host.addEventListener('input',e=>this.onInput(e));this.host.addEventListener('change',e=>this.onInput(e));this.host.addEventListener('pointerdown',e=>{const t=(e.target as HTMLElement).closest<HTMLElement>('[data-stick]');if(t){t.setPointerCapture(e.pointerId);this.controlStick(e)}});this.host.addEventListener('pointermove',e=>{if((e.target as HTMLElement).hasPointerCapture(e.pointerId))this.controlStick(e)});this.host.addEventListener('pointerup',e=>{const t=e.target as HTMLElement;if(t.hasPointerCapture(e.pointerId))t.releasePointerCapture(e.pointerId)})
     setTimeout(()=>{const b=$('#boot');if(b)b.classList.add('fade-out')},2500);setTimeout(()=>{$('#boot')?.remove()},3050)
   }
   private top(){return this.host.querySelector<HTMLElement>('#screen')!}
   private switchMode(m:Mode){this.screen=m;this.top().scrollTop=0;this.top().classList.toggle('flight-screen',m==='flight')}
   private act(action:string,el:HTMLElement){this.audio.unlock();this.audio.play('ui');switch(action){
     case 'home':this.stopFlight();this.showMenu();break
+    case 'play':this.quickStart();break
     case 'mission':this.showMission();break
     case 'mission-go':this.missionName=$<HTMLSelectElement>('#mission-select')?.value||this.missionName;this.showVab();break
     case 'vab':this.showVab();break
@@ -135,34 +181,76 @@ export class OrbitalApp {
     case 'eva':this.activity=this.activity==='eva'?'orbit':'eva';this.scene.setActivity(this.activity);this.showFlight();break
     case 'rover':this.activity=this.activity==='rover'?'orbit':'rover';this.scene.setActivity(this.activity);this.showFlight();break
     case 'cockpit':this.scene.setCockpit(!this.cockpit);this.cockpit=!this.cockpit;this.showFlight();break
-    case 'sas-prograde':this.sas=this.sas==='PROGRADE'?'OFF':'PROGRADE';this.showFlight();break
-    case 'sas-retrograde':this.sas=this.sas==='RETROGRADE'?'OFF':'RETROGRADE';this.showFlight();break
-    case 'legs':this.landingLegs=!this.landingLegs;el.classList.toggle('active',this.landingLegs);break
+    case 'sas-prograde':this.sas=this.sas==='PROGRADE'?'OFF':'PROGRADE';this.scene.setSas(this.sas as 'OFF'|'PROGRADE'|'RETROGRADE');this.showFlight();break
+    case 'sas-retrograde':this.sas=this.sas==='RETROGRADE'?'OFF':'RETROGRADE';this.scene.setSas(this.sas as 'OFF'|'PROGRADE'|'RETROGRADE');this.showFlight();break
+    case 'legs':this.landingLegs=!this.landingLegs;this.scene.setLandingLegs(this.landingLegs);this.showFlight();break
     case 'scale':this.timeScale=Number(el.dataset.scale)||1;this.worker.postMessage({type:'set-time-scale',scale:this.timeScale} satisfies PhysicsCommand);this.showFlight();break
     case 'throttle-up':this.throttle=clamp(this.throttle+10,0,100);this.showFlight();break
     case 'throttle-down':this.throttle=clamp(this.throttle-10,0,100);this.showFlight();break
-    case 'eva-move':this.evaPos.x+=Number(el.dataset.x||0)*.2;this.evaPos.y+=Number(el.dataset.y||0)*.2;this.showFlight();break
-    case 'rover-left':this.roverSpeed=clamp(this.roverSpeed-.3,-4,4);break
-    case 'rover-right':this.roverSpeed=clamp(this.roverSpeed+.3,-4,4);break
-    case 'sound':this.audio.play('ui');break
+    case 'eva-move':this.evaPos.x+=Number(el.dataset.x||0)*.2;this.evaPos.y+=Number(el.dataset.y||0)*.2;this.scene.setEvaOffset(this.evaPos.x,this.evaPos.y);this.showFlight();break
+    case 'rover-left':this.roverSteering=clamp(this.roverSteering-.3,-1,1);this.scene.setRoverControls(this.roverSpeed,this.roverSteering);this.showFlight();break
+    case 'rover-right':this.roverSpeed=this.roverSpeed>0?0:2;this.scene.setRoverControls(this.roverSpeed,this.roverSteering);this.showFlight();break
+    case 'sound':this.muted=!this.muted;this.audio.setVolumes(1,1,this.muted);el.textContent=this.muted?'×':'♫';el.setAttribute('aria-pressed',String(this.muted));el.setAttribute('aria-label',this.muted?'Unmute sound':'Mute sound');break
     case 'restart':this.launch();break
   }}
   private onInput(e:Event){const t=e.target as HTMLInputElement;if(t.dataset.action==='throttle'){this.throttle=Number(t.value);if(this.screen==='flight')this.refreshHud()}}
   private controlStick(e:PointerEvent){const el=e.target as HTMLElement;const r=el.getBoundingClientRect();const x=clamp((e.clientX-r.left)/r.width*2-1,-1,1);const y=clamp((e.clientY-r.top)/r.height*2-1,-1,1);this.scene.setAttitude(x,y)}
-  private showMenu(){this.switchMode('menu');this.scene.setActivity('orbit');this.top().innerHTML=`<section class="hero"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-dot"></span> ETHIOPIA · LOW EARTH ORBIT</div><h1>DEFEND<br><em>THE ORBIT.</em></h1><p class="lead">Design and fly an Earth-observation mission. Balance payload, power, propellant and orbital precision—then build, launch, and operate the spacecraft.</p><div class="hero-actions"><button class="primary" data-action="mission">PLAN YOUR MISSION <span>→</span></button><button class="text-button" data-action="vab">ENTER THE VAB ↗</button></div><div class="hero-stats"><div><b>2026</b><small>SPACE APPS CHALLENGE</small></div><div><b>3</b><small>MISSION PHASES</small></div><div><b>120 <small>Hz</small></b><small>ORBITAL SOLVER</small></div></div></div><div class="hero-panel"><div class="panel-top"><span>MISSION CONTROL</span><span class="live-dot">● LIVE</span></div><div class="orbit-graphic"><div class="orbit-ring one"></div><div class="orbit-ring two"></div><div class="planet"></div><div class="satellite">✦</div><span class="orbit-label label-a">LEO / 400 KM</span><span class="orbit-label label-b">ETHIOPIA</span></div><div class="telemetry-mini"><span><small>MISSION</small><b>ORBITAL DEFENSE</b></span><span><small>FLIGHT MODE</small><b class="green-text">OFFLINE READY</b></span></div></div><div class="hero-caption">A PLAYABLE ORBITAL MISSION SIMULATOR <span>01 / 03</span></div></section><section class="feature-strip"><div><b>01</b><span><strong>DESIGN</strong><small>Build a balanced vehicle in the VAB</small></span></div><div><b>02</b><span><strong>ASCEND</strong><small>Stage, steer and manage your launch</small></span></div><div><b>03</b><span><strong>OPERATE</strong><small>Map, EVA and maintain the payload</small></span></div></section>`}
+  private showMenu(){
+    this.switchMode('menu')
+    this.activity='orbit'
+    this.cockpit=false
+    this.scene.setActivity('orbit')
+    this.scene.setCockpit(false)
+    this.top().innerHTML=`<section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> ETHIOPIA · LOW EARTH ORBIT</div>
+        <h1>DEFEND<br><em>THE ORBIT.</em></h1>
+        <p class="lead">Play an orbital mission, build a spacecraft, and deploy an Earth-observation payload.</p>
+        <div class="hero-actions">
+          <button class="primary" data-action="play" type="button">PLAY <span>▶</span></button>
+          <div class="secondary-actions">
+            <button class="text-button" data-action="mission" type="button">MISSIONS</button>
+            <button class="text-button" data-action="vab" type="button">BUILD</button>
+          </div>
+        </div>
+        <div class="hero-stats"><div><b>2026</b><small>SPACE APPS CHALLENGE</small></div><div><b>3</b><small>MISSION PHASES</small></div><div><b>120 <small>Hz</small></b><small>ORBITAL SOLVER</small></div></div>
+      </div>
+      <div class="hero-panel"><div class="panel-top"><span>MISSION CONTROL</span><span class="live-dot">● LIVE</span></div><div class="orbit-graphic"><div class="orbit-ring one"></div><div class="orbit-ring two"></div><div class="planet"></div><div class="satellite">✦</div><span class="orbit-label label-a">LEO / 400 KM</span><span class="orbit-label label-b">ETHIOPIA</span></div><div class="telemetry-mini"><span><small>MISSION</small><b>ORBITAL DEFENSE</b></span><span><small>FLIGHT MODE</small><b class="green-text">READY TO PLAY</b></span></div></div>
+      <div class="hero-caption">PLAY NOW · MISSIONS · SPACECRAFT BUILDING <span>01 / 03</span></div>
+    </section>`
+  }
   private showMission(){this.switchMode('mission');this.top().innerHTML=`<section class="page"><div class="page-heading"><div><div class="eyebrow">MISSION DESIGN · 01</div><h2>Choose the objective.</h2><p>Every kilogram, watt, and dollar has a destination.</p></div><span class="step-chip">01 — 03</span></div><div class="mission-layout"><div class="mission-list"><label class="field-label">SELECT MISSION PROFILE</label><select id="mission-select"><option>Ethiopian Earth Observation</option><option>Rift Valley SAR Survey</option><option>Orbital Defense Demonstrator</option></select><article class="mission-card selected"><span class="card-icon">⌖</span><div><b>Earth observation constellation</b><p>Deploy an optical imaging payload into a 400 km circular orbit at 51.6° inclination.</p><small>SCIENCE · MISSION 01 · SOLO</small></div><span class="check">✓</span></article><div class="objective-row"><span>ORBITAL ALTITUDE <b>400 KM</b></span><span>INCLINATION <b>51.6°</b></span><span>MISSION WINDOW <b>30 DAYS</b></span></div></div><aside class="budget-card"><div class="eyebrow">PROGRAMME BUDGET</div><strong class="budget-value">$5.5<span>M</span></strong><div class="budget-meter"><i></i></div><p>Allocate launch and spacecraft funds in the assembly building.</p><div class="budget-line"><span>Available</span><b>$5,500,000</b></div><div class="budget-line"><span>Payload ceiling</span><b>1,500 kg</b></div><div class="budget-line"><span>Power reserve</span><b>≥ 0 W</b></div><button class="primary full" data-action="mission-go">CONTINUE TO VAB <span>→</span></button></aside></div></section>`}
   private showVab(){this.switchMode('vab');const stats=calculateBuildStats(this.build,this.budget);const parts=[...this.build.parts].sort((a,b)=>b.positionM-a.positionM);this.top().innerHTML=`<section class="page vab-page"><div class="page-heading compact"><div><div class="eyebrow">VEHICLE ASSEMBLY BUILDING · 02</div><h2>Build your stack.</h2></div><div class="step-chip">MISSION: ${this.missionName.toUpperCase()}</div></div><div class="vab-layout"><div class="build-column"><div class="vab-toolbar"><span>STACK OVERVIEW <small>NODE-SNAP ASSEMBLY</small></span><span class="green-text">● ${stats.compatible?'STRUCTURE VALID':'CHECK CONNECTIONS'}</span></div><div class="vehicle-preview"><div class="preview-grid"></div><div class="vehicle-stack">${parts.map(p=>`<div class="stack-part kind-${p.kind}" style="--part-height:${this.partHeight(p.kind)}px" title="${PART_CATALOG[p.kind].name}"><span>${PART_CATALOG[p.kind].name}</span><button data-action="remove" data-id="${p.id}" aria-label="Remove ${p.id}">×</button></div>`).join('')}</div><div class="vab-com"><span class="com-line"></span> CENTER OF MASS</div><div class="preview-caption"><b>ETHIO-1 · ORBITAL LAUNCH VEHICLE</b><small>2-STAGE LIQUID PROPULSION · ACTIVE GUIDANCE</small></div></div><div class="part-tray"><div class="tray-label">ADD COMPONENT <small>SELECT TO SNAP TO VEHICLE</small></div><div class="part-buttons">${(['engine','tank','capsule','fairing','solar-array','optical-sensor','synthetic-radar','rtg','satellite-payload'] as PartKind[]).map(k=>`<button class="part-add" data-action="part" data-kind="${k}"><b>${this.partSymbol(k)}</b><span>${PART_CATALOG[k].name}<small>${fmt(PART_CATALOG[k].dryMassKg)} KG · $${fmt(PART_CATALOG[k].cost/1000)}K</small></span><i>+</i></button>`).join('')}</div></div></div><aside class="build-stats"><div class="stats-title">VEHICLE TELEMETRY <span>LIVE</span></div><div class="stat-big"><small>WET MASS</small><b>${fmt(stats.wetMassKg)} <i>kg</i></b><span>DRY ${fmt(stats.dryMassKg)} KG · PROP ${fmt(stats.propellantMassKg)} KG</span></div><div class="stat-grid"><div><small>THRUST / WEIGHT</small><b>${stats.thrustToWeight.toFixed(2)} <i>TWR</i></b></div><div><small>TOTAL THRUST</small><b>${fmt(stats.thrustN/1000)} <i>kN</i></b></div><div><small>POWER BUDGET</small><b class="${stats.powerSurplusW>=0?'green-text':'red-text'}">${stats.powerSurplusW>=0?'+':''}${fmt(stats.powerSurplusW)} <i>W</i></b></div><div><small>CENTER OF MASS</small><b>${stats.centerOfMassM.toFixed(1)} <i>m</i></b></div></div><div class="budget-box"><span>PROGRAMME SPEND</span><b>$${fmt(stats.cost)}</b><small>REMAINING $${fmt(stats.budgetRemaining)}</small></div><div class="science-check ${stats.instrumentsPowered?'':'warning'}"><b>${stats.instrumentsPowered?'✓':'!'}</b><span>${stats.instrumentsPowered?'SCIENCE SYSTEMS POWERED':'POWER DEFICIT'}<small>${fmt(stats.solarPowerAvailableW)} W generation · ${fmt(stats.instrumentPowerDemandW)} W demand</small></span></div><button class="primary full launch-button" data-action="launch" ${!stats.compatible||stats.thrustToWeight<.5?'disabled':''}>BEGIN ORBITAL MISSION <span>→</span></button><button class="text-button back-link" data-action="mission">← EDIT MISSION</button></aside></div></section>`}
   private partHeight(k:PartKind){return ({capsule:44,engine:34,tank:70,fairing:45,'solar-array':20,'optical-sensor':24,'synthetic-radar':27,rtg:21,'satellite-payload':31} as Record<PartKind,number>)[k]}
   private partSymbol(k:PartKind){return ({capsule:'◉',engine:'▾',tank:'▤',fairing:'△','solar-array':'▥','optical-sensor':'◎','synthetic-radar':'⌁',rtg:'⚛','satellite-payload':'✦'} as Record<PartKind,string>)[k]}
   private addVabPart(k:PartKind){const stage=k==='engine'||k==='tank'?0:2;const y=this.build.parts.reduce((m,p)=>Math.max(m,p.positionM),0)+.65;const mountMode:VehicleBuild['parts'][number]['mountMode']=['solar-array','optical-sensor','synthetic-radar','rtg','satellite-payload'].includes(k)?'side':k==='fairing'?'shell':'stack';this.build=addPart(this.build,{id:`${k}-${Date.now()}`,kind:k,mountMode,positionM:y,stage,fuelFraction:k==='tank'?1:undefined});this.showVab()}
   private removeVabPart(id:string){this.build={...this.build,parts:this.build.parts.filter(p=>p.id!==id)};this.showVab()}
+  private quickStart(){
+    this.stopFlight()
+    this.build=makeStarterBuild()
+    this.missionName='Ethiopian Earth Observation'
+    this.activity='orbit'
+    this.cockpit=false
+    this.sas='OFF'
+    this.flightSideScroll=0
+    this.evaPos={x:0,y:0,z:0}
+    this.roverSpeed=0
+    this.roverSteering=0
+    this.scene.setEvaOffset(0,0)
+    this.scene.setRoverControls(0,0)
+    this.scene.setLandingLegs(false)
+    this.scene.setSas('OFF')
+    this.scene.setActivity('orbit')
+    this.scene.setCockpit(false)
+    this.launch()
+  }
   private launch(){this.state={position:{x:EARTH.meanRadius+300_000,y:0,z:0},velocity:{x:0,y:7_500,z:450},mass:Math.max(3_000,calculateBuildStats(this.build).wetMassKg),time:0};this.stageIndex=0;this.fairing=true;this.payloadDeployed=false;this.throttle=0;this.timeScale=1;this.running=true;this.worker.postMessage({type:'init',state:this.state,vehicle:{area:12,dragCoefficient:0.35,thrust:calculateBuildStats(this.build).thrustN*this.throttle/100,specificImpulse:300,dryMassKg:calculateBuildStats(this.build).dryMassKg},stepsPerTick:1} satisfies PhysicsCommand);this.worker.postMessage({type:'set-time-scale',scale:this.timeScale} satisfies PhysicsCommand);this.worker.postMessage({type:'set-running',running:true} satisfies PhysicsCommand);this.audio.play('win');this.showFlight()}
   private stopFlight(){this.running=false;this.worker.postMessage({type:'set-running',running:false} satisfies PhysicsCommand)}
   private stage(){const r=separateNextStage(this.build);if(!r){return}this.build=r.build;this.stageIndex++;this.state.mass=Math.max(500,this.state.mass-r.detachedMassKg);this.worker.postMessage({type:'reset',state:this.state} satisfies PhysicsCommand);this.worker.postMessage({type:'set-vehicle',vehicle:{area:6,dragCoefficient:.25,thrust:(this.stageIndex<2?600_000:90_000)*this.throttle/100,specificImpulse:315,dryMassKg:calculateBuildStats(this.build).dryMassKg}} satisfies PhysicsCommand);this.audio.play('dash');this.showFlight()}
   private jettison(){if(!this.fairing)return;const r=jettisonFairings(this.build);this.build=r.build;this.fairing=false;this.state.mass=Math.max(300,this.state.mass-r.detachedMassKg);this.worker.postMessage({type:'reset',state:this.state} satisfies PhysicsCommand);this.worker.postMessage({type:'set-vehicle',vehicle:{area:12,dragCoefficient:.35,thrust:calculateBuildStats(this.build).thrustN*this.throttle/100,specificImpulse:300,dryMassKg:calculateBuildStats(this.build).dryMassKg}} satisfies PhysicsCommand);this.audio.play('dash');this.showFlight()}
   private updateOrbit(){const pts=predictTrajectory(this.state,180);this.scene.setOrbit(pts)}
   private telemetryValues(){const atm=atmosphereAt(this.state.position,this.state.velocity);this.maxQ=Math.max(this.maxQ,atm.dynamicPressure);this.drag=atm.dynamicPressure*.35*12/Math.max(1,this.state.mass);this.heat=stagnationHeatFlux(atm.density,atm.speed,1);return {atm,el:orbitalElements(this.state)}}
-  private showFlight(){this.switchMode('flight');this.scene.setActivity(this.activity);const {atm,el}=this.telemetryValues();this.updateOrbit();this.top().innerHTML=`<section class="flight-shell"><div class="flight-top"><div><span class="eyebrow">${this.activity==='orbit'?'ASCENT & ORBIT':'EXTRAVEHICULAR ACTIVITY'}</span><h2>${this.activity==='rover'?'PLANETARY SURFACE':this.activity==='eva'?'EVA · SATELLITE SERVICE':'FLIGHT TELEMETRY'}</h2></div><div class="mission-flags"><span class="pill">${this.missionName}</span><span class="pill green-text">● ${this.running?'LIVE':'PAUSED'}</span><button class="pill-button" data-action="map">⌖ MAP VIEW</button></div></div><div class="flight-grid"><div class="flight-view"><div class="view-corner tl">ETHIO-1 · STAGE ${this.stageIndex+1}</div><div class="view-corner tr">${this.activity.toUpperCase()} · 60 FPS</div><div class="reticle"><i></i><b>+</b><i></i></div><div class="altitude-marker"><span>APOAPSIS</span><b>${el.apoapsis?`${fmt((el.apoapsis-EARTH.meanRadius)/1000)} KM`:'ESCAPE'}</b></div><div class="rcs-stick" data-stick="rcs"><i></i><b>RCS<br>ATTITUDE</b><span>↕ &nbsp;↔</span></div><div class="view-bottom"><span><i class="green-dot"></i> ORBIT PREDICTOR ACTIVE</span><span>J2 · DRAG · RK4 / ${PHYSICS_HZ} HZ</span></div><div class="flight-controls"><label>THROTTLE <b>${Math.round(this.throttle)}%</b></label><input type="range" min="0" max="100" value="${this.throttle}" data-action="throttle"><div class="control-row"><button class="flight-button ${this.sas==='PROGRADE'?'active':''}" data-action="sas-prograde">SAS · PROGRADE</button><button class="flight-button ${this.sas==='RETROGRADE'?'active':''}" data-action="sas-retrograde">RETROGRADE</button><button class="flight-button" data-action="cockpit">${this.cockpit?'EXTERIOR':'COCKPIT'}</button><button class="flight-button" data-action="legs">LANDER LEGS</button></div></div></div><aside class="flight-side"><div class="telemetry-heading">VEHICLE STATUS <span>● LIVE</span></div><div class="hud-value"><small>ALTITUDE</small><b>${fmt((Math.hypot(this.state.position.x,this.state.position.y,this.state.position.z)-EARTH.meanRadius)/1000,1)} <i>KM</i></b></div><div class="hud-value"><small>ORBITAL VELOCITY</small><b>${fmt(Math.hypot(this.state.velocity.x,this.state.velocity.y,this.state.velocity.z))} <i>M/S</i></b></div><div class="telemetry-tiles"><div><small>APOAPSIS</small><b>${el.apoapsis?fmt((el.apoapsis-EARTH.meanRadius)/1000):'ESC' } KM</b></div><div><small>PERIAPSIS</small><b>${el.periapsis?fmt((el.periapsis-EARTH.meanRadius)/1000):'ESC'} KM</b></div><div><small>ECCENTRICITY</small><b>${el.eccentricity.toFixed(4)}</b></div><div><small>INCLINATION</small><b>${(el.inclination*180/Math.PI).toFixed(2)}°</b></div></div><div class="alert-box ${atm.dynamicPressure>35_000?'danger':''}"><span>MAX-Q</span><b>${atm.dynamicPressure>35_000?'WARNING':'NOMINAL'}</b><small>${fmt(atm.dynamicPressure/1000,1)} kPa · HEAT ${fmt(this.heat/1000,1)} kW/m²</small></div><div class="stage-row"><button class="stage-button" data-action="stage">STAGE SEPARATION <span>⏵</span></button><button class="fairing-button" data-action="fairing" ${!this.fairing?'disabled':''}>FAIRING ↗</button></div><div class="timewarp"><span>TIME WARP</span>${[1,10,50,100].map(s=>`<button class="${this.timeScale===s?'active':''}" data-action="scale" data-scale="${s}">${s}×</button>`).join('')}</div><div class="activity-actions"><button data-action="eva">${this.activity==='eva'?'CLOSE HATCH':'EVA SPACEWALK'} ↗</button><button data-action="rover">ROVER OPS ↗</button><button data-action="map">ORBIT MAP ↗</button></div>${this.activity==='eva'?`<div class="mobility"><div class="eyebrow">MMU TRANSLATION</div><div><button data-action="eva-move" data-y="1">↑</button></div><button data-action="eva-move" data-x="-1">←</button><button data-action="eva-move" data-y="-1">↓</button><button data-action="eva-move" data-x="1">→</button><small>RELATIVE POSITION ${this.evaPos.x.toFixed(1)}, ${this.evaPos.y.toFixed(1)} M</small></div>`:''}${this.activity==='rover'?`<div class="mobility"><div class="eyebrow">SIX-WHEEL ROVER · ${this.roverSpeed.toFixed(1)} M/S</div><button data-action="rover-left">◀ STEER</button><button data-action="rover-right">DRIVE ▶</button></div>`:''}</aside></div><div class="flight-footer"><span>MISSION ELAPSED <b>${fmt(this.state.time,1)} SEC</b></span><span>VEHICLE MASS <b>${fmt(this.state.mass)} KG</b></span><span>DRAG <b>${fmt(this.drag,1)} M/S²</b></span><span>STAGE <b>${this.stageIndex+1} / 3</b></span></div></section>`;this.renderMissionGuide();this.bindThrottle()}
+  private showFlight(){this.switchMode('flight');this.scene.setActivity(this.activity);const {atm,el}=this.telemetryValues();this.updateOrbit();this.top().innerHTML=`<section class="flight-shell"><div class="flight-top"><div><span class="eyebrow">${this.activity==='orbit'?'ASCENT & ORBIT':'EXTRAVEHICULAR ACTIVITY'}</span><h2>${this.activity==='rover'?'PLANETARY SURFACE':this.activity==='eva'?'EVA · SATELLITE SERVICE':'FLIGHT TELEMETRY'}</h2></div><div class="mission-flags"><span class="pill">${this.missionName}</span><span class="pill green-text">● ${this.running?'LIVE':'PAUSED'}</span><button class="pill-button" data-action="map">⌖ MAP VIEW</button></div></div><div class="flight-grid"><div class="flight-view"><div class="view-corner tl">ETHIO-1 · STAGE ${this.stageIndex+1}</div><div class="view-corner tr">${this.activity.toUpperCase()} · 60 FPS</div><div class="reticle"><i></i><b>+</b><i></i></div><div class="altitude-marker"><span>APOAPSIS</span><b>${el.apoapsis?`${fmt((el.apoapsis-EARTH.meanRadius)/1000)} KM`:'ESCAPE'}</b></div><div class="rcs-stick" data-stick="rcs"><i></i><b>RCS<br>ATTITUDE</b><span>↕ &nbsp;↔</span></div><div class="view-bottom"><span><i class="green-dot"></i> ORBIT PREDICTOR ACTIVE</span><span>J2 · DRAG · RK4 / ${PHYSICS_HZ} HZ</span></div><div class="flight-controls"><label>THROTTLE <b>${Math.round(this.throttle)}%</b></label><input type="range" min="0" max="100" value="${this.throttle}" data-action="throttle"><div class="control-row"><button class="flight-button ${this.sas==='PROGRADE'?'active':''}" data-action="sas-prograde">SAS · PROGRADE</button><button class="flight-button ${this.sas==='RETROGRADE'?'active':''}" data-action="sas-retrograde">RETROGRADE</button><button class="flight-button" data-action="cockpit">${this.cockpit?'EXTERIOR':'COCKPIT'}</button><button class="flight-button ${this.landingLegs?'active':''}" data-action="legs">LANDER LEGS</button></div></div></div><aside class="flight-side"><div class="telemetry-heading">VEHICLE STATUS <span>● LIVE</span></div><div class="hud-value"><small>ALTITUDE</small><b>${fmt((Math.hypot(this.state.position.x,this.state.position.y,this.state.position.z)-EARTH.meanRadius)/1000,1)} <i>KM</i></b></div><div class="hud-value"><small>ORBITAL VELOCITY</small><b>${fmt(Math.hypot(this.state.velocity.x,this.state.velocity.y,this.state.velocity.z))} <i>M/S</i></b></div><div class="telemetry-tiles"><div><small>APOAPSIS</small><b>${el.apoapsis?fmt((el.apoapsis-EARTH.meanRadius)/1000):'ESC' } KM</b></div><div><small>PERIAPSIS</small><b>${el.periapsis?fmt((el.periapsis-EARTH.meanRadius)/1000):'ESC'} KM</b></div><div><small>ECCENTRICITY</small><b>${el.eccentricity.toFixed(4)}</b></div><div><small>INCLINATION</small><b>${(el.inclination*180/Math.PI).toFixed(2)}°</b></div></div><div class="alert-box ${atm.dynamicPressure>35_000?'danger':''}"><span>MAX-Q</span><b>${atm.dynamicPressure>35_000?'WARNING':'NOMINAL'}</b><small>${fmt(atm.dynamicPressure/1000,1)} kPa · HEAT ${fmt(this.heat/1000,1)} kW/m²</small></div><div class="stage-row"><button class="stage-button" data-action="stage">STAGE SEPARATION <span>⏵</span></button><button class="fairing-button" data-action="fairing" ${!this.fairing?'disabled':''}>FAIRING ↗</button></div><div class="timewarp"><span>TIME WARP</span>${[1,10,50,100].map(s=>`<button class="${this.timeScale===s?'active':''}" data-action="scale" data-scale="${s}">${s}×</button>`).join('')}</div><div class="activity-actions"><button data-action="eva">${this.activity==='eva'?'CLOSE HATCH':'EVA SPACEWALK'} ↗</button><button data-action="rover">ROVER OPS ↗</button><button data-action="map">ORBIT MAP ↗</button></div>${this.activity==='eva'?`<div class="mobility"><div class="eyebrow">MMU TRANSLATION</div><div><button data-action="eva-move" data-y="1">↑</button></div><button data-action="eva-move" data-x="-1">←</button><button data-action="eva-move" data-y="-1">↓</button><button data-action="eva-move" data-x="1">→</button><small>RELATIVE POSITION ${this.evaPos.x.toFixed(1)}, ${this.evaPos.y.toFixed(1)} M</small></div>`:''}${this.activity==='rover'?`<div class="mobility"><div class="eyebrow">SIX-WHEEL ROVER · ${this.roverSpeed.toFixed(1)} M/S</div><button data-action="rover-left">TURN ◀</button><button data-action="rover-right">${this.roverSpeed>0?'STOP ROVER':'DRIVE ▶'}</button></div>`:''}</aside></div><div class="flight-footer"><span>MISSION ELAPSED <b>${fmt(this.state.time,1)} SEC</b></span><span>VEHICLE MASS <b>${fmt(this.state.mass)} KG</b></span><span>DRAG <b>${fmt(this.drag,1)} M/S²</b></span><span>STAGE <b>${this.stageIndex+1} / 3</b></span></div></section>`;this.renderMissionGuide();this.bindThrottle();const side=this.top().querySelector<HTMLElement>('.flight-side');if(side)side.scrollTop=this.flightSideScroll}
   private targetOrbitKm(){return this.missionName.includes('SAR')?450:this.missionName.includes('Defense')?500:400}
   private renderMissionGuide(){
     const side=this.top().querySelector<HTMLElement>('.flight-side');if(!side)return
