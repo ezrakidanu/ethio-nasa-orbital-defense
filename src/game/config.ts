@@ -45,7 +45,6 @@ export const DEFAULT_CONFIG = {
     minPitch: -0.35,
     maxPitch: 1.1,
     follow: 10,
-    followSpeed: 4.2,
     fov: 62,
   },
   drones: {
@@ -55,9 +54,6 @@ export const DEFAULT_CONFIG = {
     rageSpeed: 5,
     rageAt: 45,
   },
-  flight: { turnRate: 0.62, maxWarp: 100, maxQWarningKPa: 35 },
-  physics: { dragCoefficient: 0.42 },
-  rover: { maxSpeed: 5.6 },
 } as const
 
 // Gameplay always reads active values here. Source defaults remain immutable for

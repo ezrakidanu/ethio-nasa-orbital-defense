@@ -1,4 +1,4 @@
-package com.mgstudio.ethionasa;
+package com.ethioorb.game;
 
 import com.getcapacitor.BridgeActivity;
 

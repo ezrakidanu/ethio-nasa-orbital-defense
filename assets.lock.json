@@ -12,52 +12,31 @@
   },
   "bundles": {},
   "assets": {
-    "assets/models/ethio-astronaut-animated.glb": {
-      "path": "/manus-storage/game/sha256/a374849c60772a330a74edec889fce182669b8eb98394c4c1f69d3d0f9ece641.glb",
-      "sha256": "sha256:a374849c60772a330a74edec889fce182669b8eb98394c4c1f69d3d0f9ece641",
-      "size": 1546612,
+    "assets/models/astronaut-pilot.glb": {
+      "path": "/manus-storage/game/sha256/a73b4e8bd9a7bfdaa2526b700a1be44b7c6b14f929affc5dff19a696f0750b40.glb",
+      "sha256": "sha256:a73b4e8bd9a7bfdaa2526b700a1be44b7c6b14f929affc5dff19a696f0750b40",
+      "size": 998104,
       "assetType": "model",
       "groupId": "models"
     },
-    "assets/models/ethio-astronaut-rigged.glb": {
-      "path": "/manus-storage/game/sha256/8fd77e9a6a26a4633a353028a7654f3ba7510584863dafda96d7c9cd0d6cf140.glb",
-      "sha256": "sha256:8fd77e9a6a26a4633a353028a7654f3ba7510584863dafda96d7c9cd0d6cf140",
-      "size": 1267200,
-      "assetType": "model",
-      "groupId": "models"
-    },
-    "assets/models/ethio-astronaut.glb": {
-      "path": "/manus-storage/game/sha256/5e752518beaa51936904c34bb2ea0ccab55d37be99fe7a2e03b7326c66c9533a.glb",
-      "sha256": "sha256:5e752518beaa51936904c34bb2ea0ccab55d37be99fe7a2e03b7326c66c9533a",
-      "size": 1125852,
-      "assetType": "model",
-      "groupId": "models"
-    },
-    "assets/models/ethio-command-capsule.glb": {
-      "path": "/manus-storage/game/sha256/264b6f04d0c87100bf2b312bbc4913b5b7d200017acb3168f42dbf99bf9f2948.glb",
-      "sha256": "sha256:264b6f04d0c87100bf2b312bbc4913b5b7d200017acb3168f42dbf99bf9f2948",
-      "size": 1191184,
-      "assetType": "model",
-      "groupId": "models"
-    },
-    "assets/models/ethio-sixwheel-rover.glb": {
-      "path": "/manus-storage/game/sha256/33bd1a0cc771136b46895b67f6cc5b0fdc9a6dfda96383459e0aef8af79e4401.glb",
-      "sha256": "sha256:33bd1a0cc771136b46895b67f6cc5b0fdc9a6dfda96383459e0aef8af79e4401",
-      "size": 1468376,
+    "assets/models/orbital-launch-vehicle.glb": {
+      "path": "/manus-storage/game/sha256/61fca0720a260d8a7ae9c47cdcd24466d2ab2f383eeb005bc9c18c1d7e8c40a0.glb",
+      "sha256": "sha256:61fca0720a260d8a7ae9c47cdcd24466d2ab2f383eeb005bc9c18c1d7e8c40a0",
+      "size": 1225796,
       "assetType": "model",
       "groupId": "models"
     },
     "assets/share/favicon.png": {
-      "path": "/manus-storage/game/sha256/3a5c20ad8634cfed74a0dff9ea89b8bd5bf944e676c8610027056ed900145712.png",
-      "sha256": "sha256:3a5c20ad8634cfed74a0dff9ea89b8bd5bf944e676c8610027056ed900145712",
-      "size": 2571,
+      "path": "/manus-storage/game/sha256/3a49dc70c0a1f81bef123462d09f853076efc72c0ac3afa3a5464f1718857a74.png",
+      "sha256": "sha256:3a49dc70c0a1f81bef123462d09f853076efc72c0ac3afa3a5464f1718857a74",
+      "size": 3385,
       "assetType": "image",
       "groupId": "share"
     },
     "assets/share/og.png": {
-      "path": "/manus-storage/game/sha256/f8127458de96747809162d64171d8db7eef089c289ded86e2684f4b9ce354989.png",
-      "sha256": "sha256:f8127458de96747809162d64171d8db7eef089c289ded86e2684f4b9ce354989",
-      "size": 5720428,
+      "path": "/manus-storage/game/sha256/b97aa6500c523f9c87f1bab67d34852529fb081aa15a1c9da3476458a798049e.png",
+      "sha256": "sha256:b97aa6500c523f9c87f1bab67d34852529fb081aa15a1c9da3476458a798049e",
+      "size": 5628512,
       "assetType": "image",
       "groupId": "share"
     }

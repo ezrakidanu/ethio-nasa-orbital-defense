@@ -1,4 +1,4 @@
-name: Publish ETHIO-NASA and build Android APK
+name: Build offline Android APK
 
 on:
   push:
@@ -15,51 +15,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ethio-nasa-publish-${{ github.ref }}
+  group: ethio-nasa-android-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  web:
-    name: Build and deploy web game
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.18.0
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Check and build
-        run: pnpm typecheck && pnpm test && pnpm build
-        env:
-          SKIP_MANUS_ASSET_RESTORE: '1'
-          GITHUB_PAGES_BASE_PATH: /ethio-nasa-orbital-defense
-      - name: Verify static output
-        run: test -s dist/index.html && grep -q 'ETHIO-NASA' dist/index.html && grep -q 'https://ezrakidanu.github.io/ethio-nasa-orbital-defense/share/' dist/index.html && find dist/share -type f -name '*.png' | grep -q .
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
   android:
     name: Build Android debug APK
     runs-on: ubuntu-latest
@@ -84,11 +43,17 @@ jobs:
           java-version: '21'
           cache: gradle
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;34.0.0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build web assets and sync Capacitor
-        run: pnpm build && pnpm cap:sync
+      - name: Verify, bundle offline game and sync Capacitor
+        run: pnpm typecheck && pnpm test && pnpm build && pnpm exec cap sync android
         env:
           SKIP_MANUS_ASSET_RESTORE: '1'
       - name: Assemble debug APK

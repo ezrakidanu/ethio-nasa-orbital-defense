@@ -1,10 +1,13 @@
-import type { CapacitorConfig } from '@capacitor/cli'
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mgstudio.ethionasa',
-  appName: 'ETHIO-NASA Orbital Defense',
+  appId: 'com.ethioorb.game',
+  appName: 'ETHIO-NASA: Orbital Defense',
   webDir: 'dist',
-  bundledWebRuntime: false,
-}
+  android: {
+    backgroundColor: '#080b18',
+    allowMixedContent: false,
+  },
+};
 
-export default config
+export default config;

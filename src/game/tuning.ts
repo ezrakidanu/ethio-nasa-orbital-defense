@@ -11,7 +11,7 @@ function number<S extends keyof typeof CONFIG>(section: S, key: keyof typeof CON
   label: string, min: number, max: number, step: number, unit: string, boundary?: Boundary): void {
   const values = CONFIG[section] as Record<string, number>
   const defaults = DEFAULT_CONFIG[section] as Record<string, number>
-  bindings.push({ control: Object.freeze({ id: `${section}.${key}`, type: 'number', category: section === 'player' ? 'Movement' : section === 'camera' ? 'Camera' : section === 'flight' ? 'Flight' : section === 'physics' ? 'Physics' : section === 'rover' ? 'Surface' : 'Run',
+  bindings.push({ control: Object.freeze({ id: `${section}.${key}`, type: 'number', category: section === 'player' ? 'Movement' : section === 'camera' ? 'Camera' : 'Run',
     label, description: boundary === 'jump' ? 'Applies when the next jump starts.' : boundary === 'dash' ? 'Applies when the next dash starts.' : boundary === 'run' ? 'Applies when a new run starts.' : 'Updates this preview immediately.',
     unit, default: defaults[key], min, max, step,
     applyMode: boundary === 'run' ? 'NEXT_RUN' : boundary ? 'NEXT_ACTION' : 'LIVE',
@@ -30,16 +30,10 @@ number('camera', 'distance', 'Camera distance', 3, 12, 0.1, 'm')
 number('camera', 'follow', 'Camera follow speed', 2, 20, 1, '')
 number('run', 'seconds', 'Time limit', 30, 300, 10, 's', 'run')
 number('run', 'lives', 'Starting lives', 1, 10, 1, '', 'run')
-number('flight', 'turnRate', 'Attitude response', 0.15, 1.2, 0.05, 'rad/s')
-number('flight', 'maxWarp', 'Maximum time warp', 1, 100, 1, '×')
-number('flight', 'maxQWarningKPa', 'Max-Q warning threshold', 10, 90, 1, 'kPa')
-number('physics', 'dragCoefficient', 'Vehicle drag coefficient', 0.05, 1.2, 0.01, 'Cd')
-number('rover', 'maxSpeed', 'Rover speed cap', 2, 9, 0.1, 'm/s')
-number('camera', 'followSpeed', 'Camera follow response', 1, 15, 0.5, '')
 
 const byId = new Map(bindings.map(binding => [binding.control.id, binding]))
 let requested = Object.fromEntries(bindings.map(({ control }) => [control.id, control.default]))
-const valid = (values: Record<string, number>) => values['player.walkSpeed'] <= values['player.sprintSpeed'] && values['flight.turnRate'] > 0 && values['flight.maxWarp'] >= 1
+const valid = (values: Record<string, number>) => values['player.walkSpeed'] <= values['player.sprintSpeed']
 
 let unranked = false
 const gameplayModified = () => bindings.some(binding => binding.control.integrity === 'GAMEPLAY' && binding.read() !== binding.control.default)
@@ -63,7 +57,7 @@ export const tuning = {
     const candidate = { ...requested, ...patch } as Record<string, number>
     const nextActive = this.read().active
     for (const [id, value] of entries) if (byId.get(id)!.control.applyMode === 'LIVE') nextActive[id] = value
-    if (!valid(candidate) || !valid(nextActive)) throw new Error('Invalid flight tuning or walking speed must not exceed sprint speed')
+    if (!valid(candidate) || !valid(nextActive)) throw new Error('Walking speed must not exceed sprint speed')
     // All writes are simple assignments, synchronously committed before the next
     // physics/render callback. No engine callbacks run during this transaction.
     requested = candidate

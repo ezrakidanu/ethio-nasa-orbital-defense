@@ -3,18 +3,8 @@ dist/
 shots/
 /.manus-webdev/preview-identity.json
 # Assets restored from assets.lock.json
-/assets/models/ethio-astronaut-animated.glb
-/assets/models/ethio-astronaut-rigged.glb
-/assets/models/ethio-astronaut.glb
-/assets/models/ethio-command-capsule.glb
-/assets/models/ethio-sixwheel-rover.glb
+/assets/models/astronaut-pilot.glb
+/assets/models/orbital-launch-vehicle.glb
 # Assets restored from assets.lock.json
 /assets/share/favicon.png
 /assets/share/og.png
-/android/.gradle/
-/android/local.properties
-/android/build/
-/android/app/build/
-/android/.idea/
-/android/capacitor-cordova-android-plugins/
-/android/app/src/main/assets/

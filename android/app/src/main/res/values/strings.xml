@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">ETHIO-NASA Orbital Defense</string>
-    <string name="title_activity_main">ETHIO-NASA Orbital Defense</string>
-    <string name="package_name">com.mgstudio.ethionasa</string>
-    <string name="custom_url_scheme">com.mgstudio.ethionasa</string>
+    <string name="app_name">EthioOrb</string>
+    <string name="title_activity_main">EthioOrb</string>
+    <string name="package_name">com.ethioorb.game</string>
+    <string name="custom_url_scheme">com.ethioorb.game</string>
 </resources>

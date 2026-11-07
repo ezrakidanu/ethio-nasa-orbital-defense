@@ -1,15 +1,10 @@
 {
   "schemaVersion": 2,
   "title": "ETHIO-NASA: Orbital Defense",
-  "description": "Build original spacecraft, fly approximate RK4/J2 orbital missions, and explore astronaut EVA and lunar rover operations in a Three.js spaceflight simulator by MG Studio.",
-  "defaultCaptions": {
-    "x": "ETHIO-NASA: Orbital Defense — design spacecraft, fly orbital missions, and explore lunar surface operations. An original spaceflight simulator by MG Studio.",
-    "facebook": "Build a spacecraft, navigate orbit, and take an astronaut EVA or lunar rover into the field in ETHIO-NASA: Orbital Defense.",
-    "reddit": "An original Three.js spacecraft-building and orbital flight simulator with EVA and lunar rover gameplay.",
-    "discord": "ETHIO-NASA: Orbital Defense — an original spacecraft construction, orbital flight, EVA and lunar survey game."
-  },
+  "description": "An offline landscape orbital flight simulator by MG Studio / Ezra Kidanu. Design, build, launch and operate an Earth-observation mission with a VAB, live telemetry, orbital map, EVA and rover operations.",
+  "defaultCaptions": {},
   "assets": {
-    "favicon": "assets/share/favicon.png",
-    "og": "assets/share/og.png"
+    "og": "assets/share/og.png",
+    "favicon": "assets/share/favicon.png"
   }
 }
