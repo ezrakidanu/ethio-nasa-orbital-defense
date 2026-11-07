@@ -24,7 +24,7 @@ The app begins with a three-second MG Studio-branded introduction and enters an 
 
 ## Scope and limitations
 
-The two generated runtime GLB models are about 2.2 MB total; the APK also bundles fonts and local assets. This is **not** a 1 GB asset build or a near-complete Spaceflight Simulator 2 reproduction. Many components and interactions remain prototype-level; cockpit/EVA/rover modes are lightweight, and orbital-atmosphere/thermal calculations are educational approximations, not validated flight dynamics. The game is not for real mission planning. Do not pad the package with placeholder bytes: report measured APK size from the produced artifact.
+The two generated runtime GLB models are about 2.2 MB total; the measured debug APK is 18,603,879 bytes (18.6 MB), and the production `dist` bundle is about 15 MB. This is **not** a 1 GB asset build or a near-complete Spaceflight Simulator 2 reproduction. Many components and interactions remain prototype-level; cockpit/EVA/rover modes are lightweight, and orbital-atmosphere/thermal calculations are educational approximations, not validated flight dynamics. The game is not for real mission planning. No placeholder bytes are included.
 
 ## Project structure
 
