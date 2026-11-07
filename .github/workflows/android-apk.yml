@@ -51,8 +51,6 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify, bundle offline game and sync Capacitor
         run: pnpm typecheck && pnpm test && pnpm build && pnpm exec cap sync android
-        env:
-          SKIP_MANUS_ASSET_RESTORE: '1'
       - name: Assemble debug APK
         run: cd android && ./gradlew --no-daemon assembleDebug
       - name: Upload APK artifact

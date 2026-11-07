@@ -1,18 +1,24 @@
 import { copyFileSync, existsSync, lstatSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-// The production UI ships from public/; the sharing metadata tool intentionally accepts only
-// regular PNGs beneath assets/. Rehydrate its input copies for clean CI builds without Storage.
+// Runtime assets ship from public/; the managed build metadata expects source copies under assets/.
+// Rehydrate the exact tracked local inputs so clean APK builds never depend on private Storage.
 const root = process.cwd()
-for (const name of ['og.png', 'favicon.png']) {
-  const from = resolve(root, 'public/assets/share', name)
-  const to = resolve(root, 'assets/share', name)
+const files = [
+  ['models', 'astronaut-pilot.glb'],
+  ['models', 'orbital-launch-vehicle.glb'],
+  ['share', 'favicon.png'],
+  ['share', 'og.png'],
+]
+for (const [group, name] of files) {
+  const from = resolve(root, 'public/assets', group, name)
+  const to = resolve(root, 'assets', group, name)
   if (!existsSync(to)) {
-    if (!existsSync(from)) throw new Error(`Missing offline artwork: public/assets/share/${name}`)
+    if (!existsSync(from)) throw new Error(`Missing offline asset: public/assets/${group}/${name}`)
     mkdirSync(dirname(to), { recursive: true })
-    copyFileSync(from, to, { errorOnExist: true })
+    copyFileSync(from, to)
   } else {
     const stat = lstatSync(to)
-    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`Sharing asset input must be a regular file: assets/share/${name}`)
+    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`Asset input must be a regular file: assets/${group}/${name}`)
   }
 }
