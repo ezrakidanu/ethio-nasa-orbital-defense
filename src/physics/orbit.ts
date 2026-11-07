@@ -16,7 +16,7 @@ export interface KeplerianElements {
   argumentOfPeriapsis: number | null; trueAnomaly: number | null; periapsis: number | null; apoapsis: number | null;
   specificEnergy: number; bound: boolean
 }
-export interface VehicleParameters { area: number; dragCoefficient?: number; thrust?: number; specificImpulse?: number; fuelMassFlow?: number }
+export interface VehicleParameters { area: number; dragCoefficient?: number; thrust?: number; specificImpulse?: number; fuelMassFlow?: number; dryMassKg?: number }
 const add=(a:Vec3,b:Vec3):Vec3=>({x:a.x+b.x,y:a.y+b.y,z:a.z+b.z})
 const scale=(a:Vec3,s:number):Vec3=>({x:a.x*s,y:a.y*s,z:a.z*s})
 export const magnitude=(a:Vec3):number=>Math.hypot(a.x,a.y,a.z)
@@ -38,23 +38,27 @@ function derivative(s:OrbitalState, vehicle?:VehicleParameters):Derivative {
     a=add(a,drag)
   }
   let dm=0
-  if (vehicle && vehicle.thrust && vehicle.thrust>0 && s.mass>0) {
+  if (vehicle && vehicle.thrust && vehicle.thrust>0 && s.mass>(vehicle.dryMassKg??0)) {
     const direction=magnitude(s.velocity)>0?scale(s.velocity,1/magnitude(s.velocity)):{x:0,y:0,z:0}
     a=add(a,scale(direction,vehicle.thrust/s.mass))
     dm=vehicle.fuelMassFlow!==undefined?-Math.abs(vehicle.fuelMassFlow):vehicle.specificImpulse? -vehicle.thrust/(vehicle.specificImpulse*9.80665):0
   }
   return {dr:s.velocity,dv:a,dm}
 }
-function combine(s:OrbitalState, terms:readonly [Derivative,number][], dt:number):OrbitalState {
+function combine(s:OrbitalState, terms:readonly [Derivative,number][], dt:number, minimumMass=0):OrbitalState {
   let dr={x:0,y:0,z:0},dv={x:0,y:0,z:0},dm=0
   for(const [d,w] of terms){dr=add(dr,scale(d.dr,w));dv=add(dv,scale(d.dv,w));dm+=d.dm*w}
-  return {position:add(s.position,scale(dr,dt)),velocity:add(s.velocity,scale(dv,dt)),mass:Math.max(0,s.mass+dm*dt),time:s.time+dt}
+  return {position:add(s.position,scale(dr,dt)),velocity:add(s.velocity,scale(dv,dt)),mass:Math.max(minimumMass,s.mass+dm*dt),time:s.time+dt}
 }
 /** One classical fourth-order Runge-Kutta step. */
 export function rk4Step(state:OrbitalState,dt:number,vehicle?:VehicleParameters):OrbitalState {
   if(!Number.isFinite(dt)||dt<=0) throw new RangeError('dt must be finite and positive')
-  const k1=derivative(state,vehicle), k2=derivative(combine(state,[[k1,.5]],dt),vehicle), k3=derivative(combine(state,[[k2,.5]],dt),vehicle), k4=derivative(combine(state,[[k3,1]],dt),vehicle)
-  return combine(state,[[k1,1/6],[k2,1/3],[k3,1/3],[k4,1/6]],dt)
+  const dryMass=vehicle?.dryMassKg??0, available=vehicle?Math.max(0,state.mass-dryMass):0
+  const nominalFlow=vehicle?.fuelMassFlow!==undefined?Math.abs(vehicle.fuelMassFlow):vehicle?.thrust&&vehicle.specificImpulse?vehicle.thrust/(vehicle.specificImpulse*9.80665):0
+  const fuelScale=nominalFlow>0&&nominalFlow*dt>available?available/(nominalFlow*dt):1
+  const stepVehicle=vehicle&&fuelScale<1?{...vehicle,thrust:(vehicle.thrust??0)*fuelScale,fuelMassFlow:vehicle.fuelMassFlow===undefined?undefined:vehicle.fuelMassFlow*fuelScale}:vehicle
+  const k1=derivative(state,stepVehicle), k2=derivative(combine(state,[[k1,.5]],dt,dryMass),stepVehicle), k3=derivative(combine(state,[[k2,.5]],dt,dryMass),stepVehicle), k4=derivative(combine(state,[[k3,1]],dt,dryMass),stepVehicle)
+  return combine(state,[[k1,1/6],[k2,1/3],[k3,1/3],[k4,1/6]],dt,dryMass)
 }
 export function propagate(state:OrbitalState,duration:number,stepSeconds=1,vehicle?:VehicleParameters):OrbitalState {
   if(duration<0||stepSeconds<=0) throw new RangeError('duration must be non-negative and stepSeconds positive')

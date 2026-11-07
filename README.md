@@ -12,15 +12,21 @@ pnpm dev             # local development preview only
 pnpm typecheck       # TypeScript
 pnpm test            # unit and domain tests
 pnpm build           # production bundle + offline asset checks
-pnpm smoke           # Chromium playthrough of menus and mission screens
+pnpm smoke           # desktop mission completion + touch-first phone playthrough
 pnpm android:apk     # Capacitor sync + Gradle debug APK
 ```
 
 A successful Android build writes `android/app/build/outputs/apk/debug/app-debug.apk`. The debug APK is intended for testing/sideloading; Google Play distribution requires a separately signed release build. On a push to `main`, the repository workflow builds only the APK and uploads it as an Actions artifact for 30 days. It no longer deploys a GitHub Pages web game. A manual workflow run may optionally publish a public GitHub Release; that is not the default.
 
+## How to play
+
+1. From the title screen tap **Plan Your Mission**, choose a profile, and continue to the VAB. Check that the starter stack is valid, then tap **Begin Orbital Mission**.
+2. The mission starts in a 300 km insertion orbit (it does not begin with a surface liftoff). In flight, drag the throttle slider to add a short prograde burn. The active mission card shows the target apoapsis and live progress; engine thrust automatically cuts when the target orbit is reached.
+3. Tap **Deploy Payload** to finish the objective. Use the flight panel's scroll area on short landscape screens to reach staging, time warp, EVA, rover and map actions.
+
 ## Included gameplay
 
-The app begins with a three-second MG Studio-branded introduction and enters an aerospace mission console. Players choose mission profiles, configure a staged vehicle with a snap-based parts catalog, and inspect live mission cost, wet/dry mass, propellant, thrust-to-weight, center of mass, power generation and instrument load. Flight includes a 120 Hz RK4 physics worker, Earth inverse-square gravity and J2, atmospheric drag and density, dynamic-pressure/Max-Q indication, an approximate Sutton–Graves heating calculation, throttle, two-axis RCS control, prograde/retrograde SAS indicators, time warp, stage separation, fairing jettison, flight telemetry, predicted Keplerian orbit and map view. Lightweight cockpit/EVA and rover interaction modes are present.
+The app begins with a three-second MG Studio-branded introduction and enters an aerospace mission console. Players choose mission profiles, configure a staged vehicle with a snap-based parts catalog, and inspect live mission cost, wet/dry mass, propellant, thrust-to-weight, center of mass, power generation and instrument load. Flight includes a 120 Hz RK4 physics worker, Earth inverse-square gravity and J2, atmospheric drag and density, dynamic-pressure/Max-Q indication, an approximate Sutton–Graves heating calculation, a mission target with live orbit progress, prograde throttle burn, automatic target cutoff and payload deployment, dry-mass-preserving propellant cutoff, two-axis RCS control, prograde/retrograde SAS indicators, time warp, stage separation, fairing jettison, live flight telemetry, predicted Keplerian orbit and map view. Lightweight cockpit/EVA and rover interaction modes are present.
 
 ## Scope and limitations
 

@@ -24,6 +24,16 @@ describe('orbital physics',()=>{
     expect(next.time).toBeCloseTo(1,10)
     expect(propagate(state,1,1/120).position.x).toBeCloseTo(next.position.x,7)
   })
+  it('cuts thrust at dry mass and never consumes structural mass when a burn ends mid-step',()=>{
+    const state={...circular(),mass:1_005}
+    const next=rk4Step(state,1,{area:0,thrust:10_000,specificImpulse:100,fuelMassFlow:10,dryMassKg:1_000})
+    expect(next.mass).toBeGreaterThanOrEqual(1_000)
+    expect(next.mass).toBeLessThan(state.mass)
+    expect(next.velocity.y-state.velocity.y).toBeGreaterThan(0)
+    const coast=rk4Step({...next,mass:1_000},1,{area:0,thrust:10_000,specificImpulse:100,fuelMassFlow:10,dryMassKg:1_000})
+    expect(coast.mass).toBe(1_000)
+    expect(Math.abs(coast.velocity.y-next.velocity.y)).toBeLessThan(1)
+  })
   it('computes altitude-dependent atmosphere, corotating relative flow, heating and ablation',()=>{
     expect(atmosphericDensity(0)).toBeCloseTo(1.225)
     expect(atmosphericDensity(150_000)).toBe(0)
